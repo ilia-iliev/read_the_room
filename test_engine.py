@@ -104,43 +104,98 @@ def test_events_join_with_newlines_in_order():
 # ----- pick_speakers: who reacts this turn -----
 
 
-def test_single_character_room_always_returns_the_one(monkeypatch):
+def pick_first(seq, weights):
+    return [seq[0]]
+
+
+def test_single_character_room_always_returns_the_one():
     a = make_char("Solo")
-    scen = make_scen(a)
+    game = new_game(make_scen(a))
     # even with a name match impossible and randomness irrelevant, it's always [a]
-    assert pick_speakers(scen, "anything at all") == [a]
+    assert pick_speakers(game, "anything at all") == [a]
 
 
 def test_named_character_speaks(monkeypatch):
     a, b = make_char("Warden"), make_char("Scribe")
-    scen = make_scen(a, b)
-    monkeypatch.setattr(engine.random, "random", lambda: 1.0)  # suppress interjection
-    assert pick_speakers(scen, "Warden, open up.") == [a]
+    game = new_game(make_scen(a, b))
+    monkeypatch.setattr(engine.random, "random", lambda: 1.0)  # suppress interjections
+    assert pick_speakers(game, "Warden, open up.") == [a]
 
 
 def test_only_named_characters_when_interjection_suppressed(monkeypatch):
     a, b = make_char("Warden"), make_char("Scribe")
-    scen = make_scen(a, b)
+    game = new_game(make_scen(a, b))
     monkeypatch.setattr(engine.random, "random", lambda: 1.0)
-    assert pick_speakers(scen, "Scribe and Warden, hear me.") == [a, b]
+    assert pick_speakers(game, "Scribe and Warden, hear me.") == [a, b]
 
 
-def test_interjection_appends_one_from_the_others(monkeypatch):
+def test_interjection_appends_the_others(monkeypatch):
     a, b = make_char("Warden"), make_char("Scribe")
-    scen = make_scen(a, b)
+    game = new_game(make_scen(a, b))
     monkeypatch.setattr(engine.random, "random", lambda: 0.0)  # force interjection
-    monkeypatch.setattr(engine.random, "choice", lambda seq: seq[0])
-    speakers = pick_speakers(scen, "Warden, open up.")
+    speakers = pick_speakers(game, "Warden, open up.")
     assert speakers[0] is a
     assert b in speakers and len(speakers) == 2
 
 
-def test_no_name_picks_one_at_random(monkeypatch):
+def test_name_inside_a_word_does_not_match(monkeypatch):
+    # "Ann" must not be summoned by "cannot" — whole-word matches only
+    a, b = make_char("Ann"), make_char("Bo")
+    game = new_game(make_scen(a, b))
+    monkeypatch.setattr(engine.random, "random", lambda: 1.0)  # suppress interjections
+    monkeypatch.setattr(engine.random, "choices", lambda seq, weights: [seq[1]])
+    assert pick_speakers(game, "I cannot say.") == [b]
+
+
+def test_name_match_is_case_insensitive(monkeypatch):
     a, b = make_char("Warden"), make_char("Scribe")
-    scen = make_scen(a, b)
-    monkeypatch.setattr(engine.random, "choice", lambda seq: seq[0])
-    monkeypatch.setattr(engine.random, "random", lambda: 1.0)  # suppress interjection
-    assert pick_speakers(scen, "Hello, anyone there?") == [a]
+    game = new_game(make_scen(a, b))
+    monkeypatch.setattr(engine.random, "random", lambda: 1.0)
+    assert pick_speakers(game, "open up, WARDEN.") == [a]
+
+
+def test_no_name_guarantees_one_speaker(monkeypatch):
+    a, b = make_char("Warden"), make_char("Scribe")
+    game = new_game(make_scen(a, b))
+    monkeypatch.setattr(engine.random, "random", lambda: 1.0)  # every roll fails
+    monkeypatch.setattr(engine.random, "choices", pick_first)
+    assert pick_speakers(game, "Hello, anyone there?") == [a]
+
+
+def test_guaranteed_pick_is_staleness_weighted(monkeypatch):
+    a, b = make_char("Warden"), make_char("Scribe")
+    game = new_game(make_scen(a, b))
+    game.log += [Event("line", "Warden", "x"), Event("player", "", "y")]
+    game.chars["Warden"].last_spoke_at = 1  # just spoke; Scribe silent since the intro
+    seen = {}
+
+    def spy_choices(seq, weights):
+        seen.update(zip([c.name for c in seq], weights))
+        return [seq[0]]
+
+    monkeypatch.setattr(engine.random, "random", lambda: 1.0)
+    monkeypatch.setattr(engine.random, "choices", spy_choices)
+    pick_speakers(game, "Hello, anyone there?")
+    assert seen["Scribe"] > seen["Warden"]
+
+
+def test_rolled_speakers_capped_at_the_stalest_three(monkeypatch):
+    cast = [make_char(f"C{i}") for i in range(5)]
+    game = new_game(make_scen(*cast))
+    game.log += [Event("player", "", "x")] * 4
+    for i, c in enumerate(cast):
+        game.chars[c.name].last_spoke_at = i  # C0 longest silent … C4 freshest
+    monkeypatch.setattr(engine.random, "random", lambda: 0.0)  # everyone rolls in
+    # the cap keeps the three stalest and drops the freshest, in cast order
+    assert pick_speakers(game, "no names here") == cast[:3]
+
+
+def test_named_characters_are_exempt_from_the_cap(monkeypatch):
+    cast = [make_char(n) for n in ("Ada", "Ben", "Cy", "Dot")]
+    game = new_game(make_scen(*cast))
+    monkeypatch.setattr(engine.random, "random", lambda: 0.0)
+    speakers = pick_speakers(game, "Ada, Ben, Cy, Dot — all of you, listen.")
+    assert speakers == cast  # all four named: every one speaks, no dice slots left
 
 
 # ----- rewind: snapshots, restoring an earlier point -----

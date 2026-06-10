@@ -27,8 +27,9 @@ class CharacterTurn(dspy.Signature):
     )
     updated_dispositions: dict[str, str] = dspy.OutputField(
         desc="your REFRESHED stance after speaking, reflecting all of `since_you_spoke`. A JSON "
-        "object with one short clause per key: 'Player' (the player), your OWN name (how you "
-        "feel right now), and EACH other character by their name. Include every key."
+        "object with one short clause per key: 'Player' (how you now regard the player), your "
+        "OWN name (how you feel right now), and EACH other character by their name (how YOU now "
+        "regard THAT character — never their view of anyone else). Include every key."
     )
 
 
@@ -55,9 +56,9 @@ class SituationDriver(dspy.Signature):
         "and what hangs unresolved. A snapshot to orient the next beat, NOT prose narration."
     )
     next_scene: str = dspy.OutputField(
-        desc="what happens next as a result of this turn, present tense, NO quoted dialogue. Narrate "
-        "objective events in the room; never address the player or tell them what they 'must' do. "
-        "Present the next beat for the player to answer."
+        desc="Narration in third-person of what happens next as a result of this turn, present tense. Description "
+        "of events and action - no quotes, dialogue or addressing characters/player. "
+        "The player has to decide for himself what to do after this narration."
     )
 
 
@@ -105,7 +106,7 @@ class Finale(dspy.Signature):
         desc="the verdict already settled by the referee: 'won' or 'lost'"
     )
     closing: str = dspy.OutputField(
-        desc="the final scene, present tense, NO quoted dialogue. If 'won', narrate the player "
+        desc="Narration of the final scene, present tense, action only, in third-person only. If 'won', narrate the player "
         "achieving the goal — they get what they came for. If 'lost', narrate how it ends against "
-        "them. Resolve it decisively; never address the player."
+        "them. Resolve it decisively with a clear win/lose outcome."
     )

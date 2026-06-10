@@ -42,8 +42,12 @@ PLAY_TEMP = 0.7  # creative enough for twists, low enough to obey the concede ru
 dspy.configure(lm=make_lm(PLAY_TEMP, cache=False))
 
 
-# how often a second, uninvited character jumps in to react this turn
+# each character not already speaking interjects independently with this chance, so a
+# bigger cast yields more voices per turn (expected speakers, none named: 1 + 0.4·(n-1))
 INTERJECT_CHANCE = 0.4
+# bound on voices per turn: each speaker is a full streamed model call, so an uncapped big
+# cast would drag the turn. Characters the player named are exempt — they were asked for.
+MAX_SPEAKERS_TO_SAMPLE = 3
 
 
 # ----- runtime state -----
@@ -244,18 +248,31 @@ def trace_last_call(game, label):
     )
 
 
-def pick_speakers(scen, directive):
-    """Semi-random turn-taking: characters named in the directive speak (in mention
-    order); otherwise one at random; sometimes a second voice interjects."""
-    chars = scen.characters
+def _staleness(game, char):
+    """Log-distance since this character last spoke: the longer silent, the larger."""
+    return len(game.log) - game.chars[char.name].last_spoke_at
+
+
+def pick_speakers(game, directive):
+    """Turn-taking: characters named in the directive always speak; every other character
+    rolls an independent interjection, with at least one voice guaranteed. The dice favor
+    the longest-silent — the guaranteed pick is staleness-weighted and the cap drops the
+    freshest voices first — so nobody starves as the cast grows."""
+    chars = game.scenario.characters
     if len(chars) == 1:
         return list(chars)
-    low = directive.lower()
-    speakers = [c for c in chars if c.name.lower() in low] or [random.choice(chars)]
-    others = [c for c in chars if c not in speakers]
-    if others and random.random() < INTERJECT_CHANCE:
-        speakers.append(random.choice(others))
-    return speakers
+    named = [
+        c
+        for c in chars
+        if re.search(rf"\b{re.escape(c.name)}\b", directive, re.IGNORECASE)
+    ]
+    others = [c for c in chars if c not in named]
+    rolled = [c for c in others if random.random() < INTERJECT_CHANCE]
+    if not named and not rolled:
+        rolled = random.choices(others, weights=[_staleness(game, c) for c in others])
+    quota = max(0, MAX_SPEAKERS_TO_SAMPLE - len(named))
+    kept = sorted(rolled, key=lambda c: _staleness(game, c), reverse=True)[:quota]
+    return named + [c for c in others if c in kept]
 
 
 def _streamed(module, *fields):
@@ -302,6 +319,30 @@ async def _judge(stream):
     return result
 
 
+def _refresh_silent(game, moved, keys, label):
+    """Every character that did NOT speak this turn (a dice roll, not a choice) reflects on
+    events since it last spoke, refreshing its row without saying a line — so no stance the
+    referee or finale reads is stale. Reuses CharacterTurn minus its `line` output: same
+    field strings, one source. Skips anyone already in `moved`; safe to call twice a turn."""
+    scen = game.scenario
+    refresher = dspy.Predict(
+        CharacterTurn.delete("line").with_instructions(scen.stage_rules)
+    )
+    for char in scen.characters:
+        if char.name in moved:
+            continue
+        cs = game.chars[char.name]
+        pred = refresher(
+            persona=char.persona,
+            disposition=render_row(char.name, cs.disposition, keys),
+            scene=game.scene,
+            since_you_spoke=render_window(game.log[cs.last_spoke_at + 1 :]),
+        )
+        moved[char.name] = cs.disposition  # A: stance before this reflection
+        cs.disposition = merge_row(cs.disposition, pred.updated_dispositions, keys)
+        trace_last_call(game, f"Disposition refresh · {char.name}  ({label})")
+
+
 async def play_turn_stream(game, directive):
     """Mutates `game` in place; yields (current, concluded) as the cast speaks.
     `current` is the in-progress speaker's partial dict, or None between speakers —
@@ -317,7 +358,7 @@ async def play_turn_stream(game, directive):
 
     keys = row_keys(scen)
     moved = {}  # name -> prior disposition ROW (A), for characters that spoke this turn
-    for char in pick_speakers(scen, directive):
+    for char in pick_speakers(game, directive):
         cs = game.chars[char.name]
         window = render_window(game.log[cs.last_spoke_at + 1 :])
         cur = {"name": char.name, "reasoning": "", "line": ""}
@@ -344,14 +385,19 @@ async def play_turn_stream(game, directive):
         trace_last_call(game, f"CharacterTurn · {char.name}  (turn {game.turn + 1})")
         yield None, False
 
+    final_turn = game.turn + 1 >= scen.max_turns
+    label = f"turn {game.turn + 1}"
+    if final_turn:
+        # the verdict is forced this turn: let the silent minds catch up first, so the
+        # referee rules on no stale row
+        _refresh_silent(game, moved, keys, label)
+
     this_turn = render_window(game.log[turn_start:])
     room = render_room(scen, moved, game.chars)
     prior = [e.text for e in game.log[:turn_start] if e.kind == "player"]
     player_so_far = (
         "\n".join(f"- {t}" for t in prior) or "(first move — nothing said yet)"
     )
-    final_turn = game.turn + 1 >= scen.max_turns
-    label = f"turn {game.turn + 1}"
 
     # the referee is the SOLE judge: it rules before anyone narrates, so a later beat can never
     # second-guess the verdict. On the final turn it must commit — no 'ongoing' past the clock.
@@ -389,26 +435,10 @@ async def play_turn_stream(game, directive):
         if d.next_scene.strip():
             game.log.append(Event("beat", "", d.next_scene))
     else:
-        # resolved — early or at the cap. Before the finale renders "how every mind finally read
-        # you", let every character who DIDN'T speak this turn (a dice roll, not a choice) reflect
-        # on the closing events, so no stance is stale. Reuse CharacterTurn minus its `line` output:
-        # same field strings, one source — the silent ones update their read without speaking.
-        refresher = dspy.Predict(
-            CharacterTurn.delete("line").with_instructions(scen.stage_rules)
-        )
-        for char in scen.characters:
-            if char.name in moved:
-                continue  # spoke this turn — already refreshed
-            cs = game.chars[char.name]
-            pred = refresher(
-                persona=char.persona,
-                disposition=render_row(char.name, cs.disposition, keys),
-                scene=game.scene,
-                since_you_spoke=render_window(game.log[cs.last_spoke_at + 1 :]),
-            )
-            moved[char.name] = cs.disposition  # A: stance before this final reflection
-            cs.disposition = merge_row(cs.disposition, pred.updated_dispositions, keys)
-            trace_last_call(game, f"Disposition refresh · {char.name}  ({label})")
+        # resolved early (the final-turn path already refreshed before the referee). Before the
+        # finale renders "how every mind finally read you", the silent characters reflect on the
+        # closing events, so no stance is stale.
+        _refresh_silent(game, moved, keys, label)
         room = render_room(scen, moved, game.chars)
 
         # the finale NARRATES the verdict the referee settled; it no longer judges, so it can't

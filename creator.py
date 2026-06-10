@@ -1,7 +1,7 @@
 """Promptable scenario authoring: `author` runs one model call that fills a `ScenarioSpec`
-(the same shape the hand-written scenarios have). The spec round-trips through JSON so the
-player can edit any field — or start from a blank template — before it becomes a live
-`Scenario`. The fairness rules live in the shared STAGE_RULES (scenarios/format.py), so
+(the same shape the hand-written scenarios have). The creator view edits the spec as a
+form — or starts from a blank template — and it round-trips through JSON only for
+bundling, before it becomes a live `Scenario`. The fairness rules live in the shared STAGE_RULES (scenarios/format.py), so
 the author invents only the cast and the situation, never the glue.
 """
 
@@ -47,11 +47,13 @@ class AuthorScenario(dspy.Signature):
     keep the game hard-but-winnable, so you invent ONLY the cast and the situation — never the
     glue. The scenario MUST be winnable by a perceptive player who finds each character's lever.
 
-    Write EXACTLY `num_characters` characters, each a sharply different person with a DIFFERENT
-    lever — what genuinely moves them, and what hardens them. Each `disposition` is an object
-    (a row of the room's relationship matrix) with one short clause per key: "Player" (their
-    opening stance toward the player), the character's OWN name (how they feel right now — their
-    mood), and EACH other character by name (what they think of them). Fill every key.
+    Decide `cast` FIRST: exactly `num_characters` distinct names, the full roster. Then write
+    one character per name, each a sharply different person with a DIFFERENT lever — what
+    genuinely moves them, and what hardens them. Each `disposition` is an object (a row of the
+    room's relationship matrix) with one short clause per key: "Player" (their opening stance
+    toward the player), the character's OWN name (how they feel right now — their mood), and
+    EACH other character by name (what they think of them). Every disposition carries ALL
+    `num_characters` + 1 keys — every name in `cast`, the last one included; none omitted.
 
     `intro` is present tense and addresses the player directly as "you" — it sets the scene and
     the room's challenge, the premise the player answers, no long quoted dialogue. `goal` is a
@@ -63,34 +65,100 @@ class AuthorScenario(dspy.Signature):
     num_characters: int = dspy.InputField(
         desc="how many characters must be in the room"
     )
+    # committed first so every disposition row can reference the whole roster, including
+    # names the spec hasn't introduced yet — without this the last character is omitted
+    cast: list[str] = dspy.OutputField(
+        desc="the full roster: every character's name, decided before anything else"
+    )
     spec: ScenarioSpec = dspy.OutputField(desc="the complete, ready-to-play scenario")
+
+
+class DispositionCell(BaseModel):
+    character: str = ""  # whose row
+    toward: str = ""  # the key: "Player", another name, or their own (their mood)
+    stance: str = ""  # one short clause
+
+
+class FillDispositions(dspy.Signature):
+    """Write the missing cells of a scenario's disposition matrix, in keeping with each
+    character's persona and the premise. Each cell is one character's stance toward one
+    party: toward "Player" (the player), toward another character by name, or toward their
+    OWN name (how they feel right now — their mood). One short clause per cell; write
+    exactly the requested cells, no others."""
+
+    spec: ScenarioSpec = dspy.InputField(desc="the scenario authored so far")
+    missing: list[str] = dspy.InputField(
+        desc="the cells to write, each 'character -> toward'"
+    )
+    cells: list[DispositionCell] = dspy.OutputField(
+        desc="one filled cell per missing entry"
+    )
 
 
 # higher ceiling than a play turn: a full scenario with several personas is a long answer
 AUTHOR_LM = engine.make_lm(0.8, max_tokens=3000)
 
 
+def missing_cells(spec):
+    """Every (character, toward) disposition cell with no clause — small authoring models
+    drop some even when told not to, typically the roster's last name."""
+    keys = ["Player", *[c.name for c in spec.characters]]
+    return [
+        (c.name, k)
+        for c in spec.characters
+        for k in keys
+        if not (c.disposition.get(k) or "").strip()
+    ]
+
+
+def repair_dispositions(spec):
+    """One follow-up call that writes just the missing disposition cells. Best-effort: a
+    failed call or an unanswered cell simply stays blank and editable in the creator."""
+    gaps = missing_cells(spec)
+    if not gaps:
+        return spec
+    try:
+        cells = dspy.Predict(FillDispositions)(
+            spec=spec, missing=[f"{c} -> {k}" for c, k in gaps]
+        ).cells
+    except (
+        Exception
+    ):  # malformed model output — leave the gaps rather than fail authoring
+        return spec
+    wanted = set(gaps)
+    rows = {c.name: c for c in spec.characters}
+    for cell in cells:
+        if (cell.character, cell.toward) in wanted and cell.stance:
+            rows[cell.character].disposition[cell.toward] = cell.stance
+    return spec
+
+
 def author(idea, num_characters):
-    """One model call: idea + headcount -> a full ScenarioSpec."""
+    """Idea + headcount -> a full ScenarioSpec: one authoring call, plus one repair call
+    when disposition cells come back missing."""
     with dspy.context(lm=AUTHOR_LM):
-        return dspy.Predict(AuthorScenario)(
+        spec = dspy.Predict(AuthorScenario)(
             idea=idea, num_characters=num_characters
         ).spec
+        return repair_dispositions(spec)
 
 
 def to_json(spec):
     return spec.model_dump_json(indent=2)
 
 
-def blank_json(num_characters):
+def from_json(text):
+    return ScenarioSpec.model_validate_json(text)
+
+
+def blank_spec(num_characters):
     names = [f"Character {i + 1}" for i in range(num_characters)]
     keys = ["Player", *names]  # show the matrix shape: a cell per party, incl. self
-    spec = ScenarioSpec(
+    return ScenarioSpec(
         characters=[
             CharSpec(name=n, disposition=dict.fromkeys(keys, "")) for n in names
         ]
     )
-    return to_json(spec)
 
 
 def spec_to_scenario(spec, art=None):
@@ -125,12 +193,3 @@ def spec_to_scenario(spec, art=None):
         verdict_labels=labels,
         scene_image=art.get("scene", ""),
     )
-
-
-def scenario_from_json(text, art=None):
-    return spec_to_scenario(ScenarioSpec.model_validate_json(text), art)
-
-
-def cast_names(text):
-    """The character names in a spec JSON — used to lay out one art uploader per character."""
-    return [c.name for c in ScenarioSpec.model_validate_json(text).characters]

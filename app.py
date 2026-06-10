@@ -55,12 +55,12 @@ with gr.Blocks(
     with gr.Tabs() as tabs:
         for scen in REGISTRY.values():
             gameview.build_game(scen)
-        play_btn, spec, art = creatorview.build_creator()
+        play_btn, form, art = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
             _scen_state, play_outs = gameview.build_game_ui()
 
     parse_state = gr.State()
-    play_btn.click(creatorview.parse_or_raise, [spec, art], parse_state).success(
+    play_btn.click(creatorview.parse_or_raise, [*form, art], parse_state).success(
         do_load, parse_state, [tabs, *play_outs]
     )
 

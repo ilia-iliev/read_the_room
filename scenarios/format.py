@@ -17,8 +17,7 @@ multi-turn scenario where you must respond to the player's words and the room's 
 - judge whether the player's words genuinely give you something you crave. If they do, you are
 moved and to soften accordingly
 - if you sense contradiction or stalling, you get ANGRY
-- Respond to what the player ACTUALLY said. Never invent new demands they couldn't have
-  anticipated, and never move the goalposts after they've genuinely satisfied you
+- Respond to what the player actually said
 
 Stay in your own voice and your interests. You speak only for yourself."""
 
