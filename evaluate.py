@@ -1,11 +1,12 @@
-"""Disposition eval — does one player line move a character the right way?
+"""Evals on eval-owned fixtures (not the shipping scenarios), staged so the right answer
+can't be argued.
 
-Runs the REAL `engine.CharacterTurn` on a single line, then diffs its before/after stance
-with `DispositionShift`, a neutral comparator. Two calls per check. Fixtures are eval-owned
-standoffs (not the shipping scenarios) staged so the direction can't be argued.
+Disposition: run the real CharacterTurn on one staged line, diff its before/after stance
+with the neutral DispositionShift comparator. Referee: one real Referee call per staged
+turn, asserted on its outcome label.
 
-  uv run evaluate.py                 quick (1 run, cache ON)
-  uv run evaluate.py --strict        all-of-3 (cache OFF)
+  uv run evaluate.py                 quick (1 run)
+  uv run evaluate.py --strict        all-of-3
   uv run evaluate.py [--strict] ferry   one fixture only
 """
 
@@ -16,9 +17,7 @@ import dspy
 
 import engine
 from scenarios.format import Character, Scenario
-
-# 1: cache ON, gentle on the GPU. >1 (--strict): all-of-N, cache OFF for fresh variance.
-RUNS = 1
+from signatures import CharacterTurn, Referee
 
 
 def mark(ok):
@@ -347,20 +346,20 @@ def outcome_passes(case, referee):
     return engine.norm_label(pred.outcome) in case.expect
 
 
-def evaluate_outcomes(referee):
-    print(f"\n{'=' * 70}\n  Gate — referee outcome   [all-of-{RUNS}]\n{'=' * 70}")
+def evaluate_outcomes(referee, runs):
+    print(f"\n{'=' * 70}\n  Gate — referee outcome   [all-of-{runs}]\n{'=' * 70}")
     passed = 0
     for case in OUTCOME_CASES:
-        oks = [outcome_passes(case, referee) for _ in range(RUNS)]
+        oks = [outcome_passes(case, referee) for _ in range(runs)]
         all_ok = all(oks)
         passed += all_ok
         want = "/".join(sorted(case.expect))
         print(
-            f"  {mark(all_ok)} {case.note[:50]:<50} want {want:<14} {sum(oks)}/{RUNS}"
+            f"  {mark(all_ok)} {case.note[:50]:<50} want {want:<14} {sum(oks)}/{runs}"
         )
     ok = passed == len(OUTCOME_CASES)
     print(
-        f"\n  {mark(ok)} outcome: {passed}/{len(OUTCOME_CASES)} passed all {RUNS} runs"
+        f"\n  {mark(ok)} outcome: {passed}/{len(OUTCOME_CASES)} passed all {runs} runs"
     )
     return ok
 
@@ -388,38 +387,37 @@ def shift_passes(scen, case, actor, comparator):
     return engine.norm_label(verdict.shift) == case.expect
 
 
-def evaluate_suite(scen, actor, comparator):
+def evaluate_suite(scen, actor, comparator, runs):
     print(
-        f"\n{'=' * 70}\n  {scen.title} — disposition  (id: {scen.id})   [all-of-{RUNS}]\n{'=' * 70}"
+        f"\n{'=' * 70}\n  {scen.title} — disposition  (id: {scen.id})   [all-of-{runs}]\n{'=' * 70}"
     )
     items = SHIFT_CASES.get(scen.id, [])
     passed = 0
     for case in items:
-        oks = [shift_passes(scen, case, actor, comparator) for _ in range(RUNS)]
+        oks = [shift_passes(scen, case, actor, comparator) for _ in range(runs)]
         all_ok = all(oks)
         passed += all_ok
         note = case.note or case.line
         print(
-            f"  {mark(all_ok)} [{case.char:<8}] {note[:42]:<42} want {case.expect:<8} {sum(oks)}/{RUNS}"
+            f"  {mark(all_ok)} [{case.char:<8}] {note[:42]:<42} want {case.expect:<8} {sum(oks)}/{runs}"
         )
     ok = passed == len(items)
-    print(f"\n  {mark(ok)} disposition: {passed}/{len(items)} passed all {RUNS} runs")
+    print(f"\n  {mark(ok)} disposition: {passed}/{len(items)} passed all {runs} runs")
     return ok
 
 
 def main():
-    global RUNS
     args = sys.argv[1:]
+    runs = 1
     if "--strict" in args:
         args.remove("--strict")
-        RUNS = 3
-    lm = engine.make_lm(0.2, cache=(RUNS == 1))
+        runs = 3
+    lm = engine.make_lm(0.2, cache=False)
 
     registry = {s.id: s for s in EVAL_FIXTURES}
     only = args[0] if args else None
     scenarios = [registry[only]] if only else list(registry.values())
-    mode = f"all-of-{RUNS}, cache off" if RUNS > 1 else "quick, cache on"
-    print(f"  mode: {mode}")
+    print(f"  mode: all-of-{runs}, cache off")
 
     comparator = dspy.Predict(DispositionShift)  # scene-agnostic, no stage_rules
     results = {}
@@ -428,12 +426,14 @@ def main():
             continue
         with dspy.context(lm=lm):
             actor = dspy.Predict(CharacterTurn.with_instructions(scen.stage_rules))
-            results[f"{scen.id}/disposition"] = evaluate_suite(scen, actor, comparator)
+            results[f"{scen.id}/disposition"] = evaluate_suite(
+                scen, actor, comparator, runs
+            )
 
     if not only or only == "gate":
         with dspy.context(lm=lm):
             referee = dspy.Predict(Referee.with_instructions(GATE.director_rules))
-            results["gate/outcome"] = evaluate_outcomes(referee)
+            results["gate/outcome"] = evaluate_outcomes(referee, runs)
 
     print(f"\n{'=' * 70}\n  SUMMARY")
     for key, ok in results.items():

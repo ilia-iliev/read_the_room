@@ -1,11 +1,8 @@
-"""Promptable scenario authoring. The engine is fully data-driven — a scenario is just a
-`Scenario` object — so the AI can write a brand-new playable game from one line of idea.
-
-`author` runs ONE model call that fills a `ScenarioSpec` (the same shape the hand-written
-scenarios have). The spec round-trips through JSON so the player can edit any field — or
-start from a blank template — before `scenario_from_json` turns it into a live `Scenario`.
-The fairness rules that keep a scenario winnable live in the engine's shared `STAGE_RULES`,
-so the author only invents the cast and the situation, never the glue.
+"""Promptable scenario authoring: `author` runs one model call that fills a `ScenarioSpec`
+(the same shape the hand-written scenarios have). The spec round-trips through JSON so the
+player can edit any field — or start from a blank template — before it becomes a live
+`Scenario`. The fairness rules live in the shared STAGE_RULES (scenarios/format.py), so
+the author invents only the cast and the situation, never the glue.
 """
 
 import uuid

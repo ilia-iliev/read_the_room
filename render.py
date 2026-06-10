@@ -28,12 +28,9 @@ def esc(text):
 PROMPT_TO_SPEAK = "*The room turns to you. What do you say?*"
 
 
-# Inline "regenerate from here" affixed to each of the player's past lines. Clicking it rewinds
-# to that turn and replays it (same words, fresh reaction). Each turn index has its OWN hidden
-# button (`.rtr-regen-N`, wired in gameview.py to rewind to turn N), so the link just confirms
-# and clicks that button — no value to pass through the frontend, which is where the old
-# approach silently dropped the turn index. Scoped to the nearest `.rtr-game` so the right game
-# answers even with several game tabs in the page.
+# Inline rewind links on each of the player's past lines. Each turn index has its own hidden
+# button (`.rtr-regen-N` / `.rtr-edit-N`, wired in gameview.py), so the link just confirms and
+# clicks that button — no value passes through the frontend.
 def _click_hidden(cls, confirm):
     """JS for an inline link: confirm, then click THIS game's hidden `.cls` button (scoped to the
     nearest `.rtr-game`, so the right game answers even with several game tabs in the page)."""
@@ -195,12 +192,10 @@ def _web_rows(scen, game, c):
 
 
 def end_screen(scen, game):
-    """The verdict card: the result, then the room's final web — how each mind finally read the
-    player, the other characters, and itself — drawn straight from the disposition matrix the
-    game already tracked, no extra model calls. Hidden until the outcome is actually settled —
-    `concluded`, not the derived `active`, so the finale's closing beat can stream without
-    flashing a verdict the engine hasn't decided yet (the clock-cap turn flips `active` off
-    turns before `outcome` is known)."""
+    """The verdict card: the result, plus how each mind finally read the player, the others,
+    and itself — straight from the disposition matrix, no extra model calls. Gated on
+    `concluded`, not the derived `active`: the clock-cap turn flips `active` off before
+    `outcome` is known, and the finale must stream without flashing an undecided verdict."""
     if not game.concluded:
         return gr.update(value="", visible=False)
     verdict = final_verdict(game)
@@ -253,8 +248,7 @@ BLANK_STORY = (
 def turn_outputs(scen, game, *, box, status=None, current=None):
     """The seven per-turn outputs in build_game_ui's turn_outs order, for a live game.
     `box` is the input update; `status` and `current` override the defaults for the
-    live-streaming frame (a fixed think cue and the in-progress speaker). The transcript it
-    renders already carries the inline ↻ regenerate links, so there's no separate rewind UI."""
+    live-streaming frame (a fixed think cue and the in-progress speaker)."""
     return (
         render_story(scen, game, current),
         progress(scen, game) if status is None else status,

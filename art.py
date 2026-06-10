@@ -7,11 +7,11 @@ Art is CONVENTION, not configuration. Drop files under `scenarios/assets/<scenar
     scenarios/assets/hero/korg.png      <- one avatar per character, named after them
     scenarios/assets/hero/vesh.png         (slug of the character's name; png/jpg/jpeg/webp)
 
-If a file is there it's used; if not, a placeholder is generated — a coloured initial disc
-for an avatar, a title card for a scene — so the room is never empty and real art swaps in
-just by adding a file. Authored (Create-your-own) scenarios have transient ids and no asset
-folder, so instead they carry their art inline (a filepath on the Scenario/Character, which
-takes priority over the on-disk lookup) and bundle it on download; see bundle.py.
+If a file is there it's used; if not, an avatar falls back to a generated coloured initial
+disc and a scene banner is simply not shown — real art swaps in just by adding a file.
+Authored (Create-your-own) scenarios have transient ids and no asset folder, so they carry
+their art inline instead (a filepath on the Scenario/Character, which takes priority over
+the on-disk lookup) and bundle it on download; see bundle.py.
 """
 
 import base64

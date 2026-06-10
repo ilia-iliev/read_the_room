@@ -1,17 +1,10 @@
 """DSPy engine: a room of characters the player talks through.
 
 Each turn: the player speaks; one or two characters react in their own voice (acting on
-their CURRENT disposition, then refreshing it over everything since they last spoke). A
-referee then judges the turn — won, lost, or ongoing — as the SOLE arbiter of the verdict.
-If the game continues, a situation driver advances the objective scene and sets the next
-beat; if it has resolved, a finale narrates the ending the referee already settled.
-Characters are pure reactors; only the driver writes the shared scene state.
-
-Winning means the goal is concretely STAGED (the player is actually free/across/safe), not
-merely surviving the room. The referee resolves the scene the moment that happens, or the
-moment the room turns on the player with no goodwill banked. On the final turn it must
-commit: a player who earned standing and was gaining ground wins; one who stalled or wore
-out the room does not.
+their current disposition, then refreshing it); the referee — sole arbiter — rules the turn
+won, lost, or ongoing. If the game continues, the situation driver advances the scene; if
+it resolved, the finale narrates the ending the referee settled. Characters are pure
+reactors; only the driver writes the shared scene state.
 """
 
 import copy
@@ -26,7 +19,7 @@ from signatures import CharacterTurn, Finale, Referee, SituationDriver
 MODEL = "openai/Qwen3.6-27B"
 API_BASE = "http://localhost:8081/v1"
 # Qwen3.6 is a reasoning model; this toggle stops it burning the budget on hidden
-# thinking and returning empty content. See memory: model-server-quirk.
+# thinking and returning empty content.
 NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
 
 

@@ -1,11 +1,7 @@
-"""The extensible scenario format.
-
-A scenario is a social standoff the player talks their way through. The cast is a set
-of CHARACTERS, each with its own voice, agenda, and a private disposition MATRIX: a row of
-stances keyed by "Player" and by every character's name (its own name is the diagonal — how
-it currently feels). The player speaks; one or two characters react in their own voice; then
-a situation driver advances the objective scene and sets the next beat the player must
-answer. Add a scenario = add a Scenario object, touch no engine code.
+"""The extensible scenario format. A scenario is a social standoff the player talks through:
+a cast of Characters, each with its own voice, agenda, and a private disposition row keyed
+by "Player" and by every character's name (its own name is the diagonal — how it currently
+feels). Add a scenario = add a Scenario object, touch no engine code.
 """
 
 from dataclasses import dataclass
@@ -52,12 +48,10 @@ class Character:
     # (this character's own name is the self/diagonal entry — its current mood). One short
     # free-text clause per key. The engine threads and refreshes this row turn by turn.
     disposition: dict
-    # avatar art is convention, not config: drop scenarios/assets/<id>/<name>.png and it's
-    # picked up automatically (see art.py); absent -> an initial-disc placeholder.
-    avatar: str = (
-        ""  # optional inline avatar (a filepath); overrides the on-disk convention,
-    )
-    # so an authored scenario can carry its own art and bundle it on download.
+    # avatar art is convention, not config: scenarios/assets/<id>/<name>.png is picked up
+    # automatically (see art.py); absent -> an initial-disc placeholder. An inline filepath
+    # here overrides that, so an authored scenario can carry and bundle its own art.
+    avatar: str = ""
 
 
 @dataclass
@@ -78,8 +72,6 @@ class Scenario:
     # not a character. Same fairness, framed for the impartial director.
     director_rules: str = DIRECTOR_RULES
     # scene banner is convention, not config: scenarios/assets/<id>/scene.png is picked up
-    # automatically (see art.py); absent -> a generated title card.
-    scene_image: str = (
-        ""  # optional inline scene banner (a filepath); overrides the on-disk
-    )
-    # convention, so an authored scenario can carry its own banner and bundle it on download.
+    # automatically (see art.py); absent -> no banner. An inline filepath here overrides
+    # that, so an authored scenario can carry and bundle its own banner.
+    scene_image: str = ""
