@@ -1,0 +1,280 @@
+"""Pure renderers for the game view: everything that turns (scenario, game) into the
+strings and component updates the player sees. Nothing here creates a Gradio component —
+gameview.py builds the layout and handlers on top of these.
+"""
+
+import html
+
+import gradio as gr
+
+from art import avatar_uri, scene_uri
+from engine import final_verdict, new_game
+
+WIN_ICON, LOSE_ICON = "🏆", "💀"
+
+# the player-facing verb: the input label, the act button, and the turn status line
+PLAYER_VERB = "Say"
+
+
+def esc(text):
+    """Neutralise raw HTML in model/player text. The transcript renders with the HTML
+    sanitizer OFF (so our SVG-avatar <img> tags survive), so dynamic text is escaped here
+    instead — markdown (*, _, ---) still works, injected tags don't."""
+    return html.escape(text or "", quote=False)
+
+
+# A scenario-agnostic cue to act, shown once at the opening (intros set the scene but don't
+# all end on a hook). The player is "you" here; the model channel never sees this line.
+PROMPT_TO_SPEAK = "*The room turns to you. What do you say?*"
+
+
+# Inline "regenerate from here" affixed to each of the player's past lines. Clicking it rewinds
+# to that turn and replays it (same words, fresh reaction). Each turn index has its OWN hidden
+# button (`.rtr-regen-N`, wired in gameview.py to rewind to turn N), so the link just confirms
+# and clicks that button — no value to pass through the frontend, which is where the old
+# approach silently dropped the turn index. Scoped to the nearest `.rtr-game` so the right game
+# answers even with several game tabs in the page.
+def _click_hidden(cls, confirm):
+    """JS for an inline link: confirm, then click THIS game's hidden `.cls` button (scoped to the
+    nearest `.rtr-game`, so the right game answers even with several game tabs in the page)."""
+    return (
+        f"if(confirm('{confirm}'))"
+        f"{{var t=this.closest('.rtr-game').querySelector('.{cls}');"
+        # elem_classes lands on the <button> itself for a Button, but on a wrapper for others —
+        # so click the element if it's the button, else its inner button.
+        "(t.tagName==='BUTTON'?t:t.querySelector('button')).click();}return false;"
+    )
+
+
+def _inline_link(cls_prefix, turn_no, icon, title, confirm):
+    """A small inline icon that clicks the hidden `.cls_prefix-turn_no` button for player turn
+    `turn_no` (0-based, indexing game.snapshots), after a confirm prompt."""
+    return (
+        f' <a href="#" title="{title}" '
+        'style="text-decoration:none;cursor:pointer;opacity:.5" '
+        f'onclick="{_click_hidden(f"{cls_prefix}-{turn_no}", confirm)}">{icon}</a>'
+    )
+
+
+def regen_link(turn_no):
+    """↻ — rewind to this turn and replay it with the SAME words, fresh reactions."""
+    return _inline_link(
+        "rtr-regen",
+        turn_no,
+        "↻",
+        "Rewind &amp; regenerate from here",
+        "Rewind here and replay from this line? Everything after it is discarded.",
+    )
+
+
+def edit_link(turn_no):
+    """✎ — rewind to this turn and drop the original words back in the box to reword first."""
+    return _inline_link(
+        "rtr-edit",
+        turn_no,
+        "✎",
+        "Rewind &amp; edit this line",
+        "Rewind here to reword this line? Everything after it is discarded.",
+    )
+
+
+def header(scen):
+    return f"{esc(scen.intro)}\n\n**Goal:** {esc(scen.goal)}"
+
+
+def speaker_tag(uri, name):
+    """The lead-in for a character's spoken line: their avatar followed by their name."""
+    attr = html.escape(name)
+    return (
+        f'<img src="{uri}" alt="{attr}" title="{attr}" width="30" height="30" '
+        'style="display:inline-block;border-radius:50%;vertical-align:middle;'
+        'margin:0 8px 0 0">'
+        f'<strong style="vertical-align:middle;margin-right:8px">{attr}:</strong>'
+    )
+
+
+def render_story(scen, game, current=None):
+    """Rebuild the player-facing transcript from the game log. `current` is whatever is being
+    written live and not yet committed to the log: a speaker's partial dict (name/line), or a
+    scene beat the director is writing (`{"beat": text}`). Private reasoning is never shown
+    here — it lives in the debug log."""
+    avatars = {c.name: avatar_uri(scen, c) for c in scen.characters}
+    md = header(scen)
+    if not any(
+        e.kind == "player" for e in game.log
+    ):  # opening: cue the player to speak
+        md += f"\n\n{PROMPT_TO_SPEAK}"
+    turn_no = 0  # 0-based index of each player turn, matching game.snapshots for rewind
+    for e in game.log[1:]:  # log[0] is the intro; the setup card already shows it
+        if e.kind == "beat":
+            md += f"\n\n---\n\n{esc(e.text)}"
+        elif e.kind == "player":
+            md += (
+                f"\n\n**You:** *“{esc(e.text)}”*"
+                f"{regen_link(turn_no)}{edit_link(turn_no)}"
+            )
+            turn_no += 1
+        elif e.kind == "line":
+            md += f"\n\n{speaker_tag(avatars[e.who], e.who)} *{esc(e.text)}*"
+    if current and "name" in current:  # a character speaking live
+        tag = speaker_tag(avatars[current["name"]], current["name"])
+        md += f"\n\n{tag} *{esc(current['line'])}* ▌"
+    elif current:  # a scene beat the director is writing live
+        md += f"\n\n---\n\n{esc(current['beat'])} ▌"
+    return md
+
+
+def render_debug(scen, game):
+    """The full plain-text transcript for copy-paste debugging: every beat, the player's
+    words, and each character's PRIVATE reasoning alongside what they said."""
+    if scen is None or game is None:
+        return "(nothing to copy yet)"
+    lines = [f"SETUP: {scen.intro}", f"GOAL: {scen.goal}", ""]
+    for e in game.log:
+        if e.kind == "beat":
+            lines.append(f"[scene] {e.text}")
+        elif e.kind == "player":
+            lines.append(f"YOU: {e.text}")
+        elif e.kind == "line":
+            if e.reasoning:
+                lines.append(f"{e.who} (thinks): {e.reasoning}")
+            lines.append(f"{e.who}: {e.text}")
+    if not game.active:
+        lines += ["", f"RESULT: {final_verdict(game)}"]
+    lines += ["", "-- current dispositions --"]
+    for name, cs in game.chars.items():
+        row = cs.disposition
+        lines.append(f"{name}:")
+        lines.append(f"    player: {row.get('Player', '')}")
+        lines.append(f"    self:   {row.get(name, '')}")
+        lines += [
+            f"    -> {k}: {v}" for k, v in row.items() if k not in ("Player", name)
+        ]
+    return "\n".join(lines)
+
+
+def export_debug(game):
+    """The full raw LM input+output for every turn — the trace."""
+    return "\n".join(game.trace) if game and game.trace else "(no turns yet)"
+
+
+def progress(scen, game):
+    used, total = game.turn, scen.max_turns
+    if not game.active:
+        return "**Game Over**"
+    return f"**You {PLAYER_VERB.lower()}…** ({used + 1}/{total})"
+
+
+def room_strip(scen):
+    """The scene banner shown above the story — only when the scenario carries a real image;
+    otherwise nothing. The cast appear inline as they speak in the transcript, and how they
+    finally read you is the end screen."""
+    uri = scene_uri(scen)
+    if not uri:
+        return ""
+    return (
+        f'<img src="{uri}" '
+        f'style="width:100%;max-height:200px;object-fit:cover;border-radius:14px"/>'
+    )
+
+
+def _web_rows(scen, game, c):
+    """The lines of one character's final stance web: their read of the player, of each other
+    character, then their own closing mood (self) — each pulled straight from the matrix."""
+    row = game.chars[c.name].disposition
+    out = [f"<b>You:</b> {esc(row.get('Player', ''))}"]
+    out += [
+        f"<b>{esc(o.name)}:</b> {esc(row.get(o.name, ''))}"
+        for o in scen.characters
+        if o.name != c.name and row.get(o.name)
+    ]
+    mood = row.get(c.name, "")
+    if mood:
+        out.append(f"<b>Self:</b> <i>{esc(mood)}</i>")
+    return out
+
+
+def end_screen(scen, game):
+    """The verdict card: the result, then the room's final web — how each mind finally read the
+    player, the other characters, and itself — drawn straight from the disposition matrix the
+    game already tracked, no extra model calls. Hidden until the outcome is actually settled —
+    `concluded`, not the derived `active`, so the finale's closing beat can stream without
+    flashing a verdict the engine hasn't decided yet (the clock-cap turn flips `active` off
+    turns before `outcome` is known)."""
+    if not game.concluded:
+        return gr.update(value="", visible=False)
+    verdict = final_verdict(game)
+    icon = WIN_ICON if verdict == scen.verdict_labels[0] else LOSE_ICON
+    cards = "".join(
+        f'<div style="display:flex;gap:12px;align-items:flex-start;margin:12px 0">'
+        f'<img src="{avatar_uri(scen, c)}" '
+        f'style="width:52px;height:52px;border-radius:50%;flex:none"/>'
+        f"<div><b>{esc(c.name)}</b>"
+        + "".join(
+            f'<div style="opacity:.85;font-size:.92em">{line}</div>'
+            for line in _web_rows(scen, game, c)
+        )
+        + "</div></div>"
+        for c in scen.characters
+    )
+    return gr.update(
+        value=(
+            f'<div style="text-align:center;font-size:44px;line-height:1">{icon}</div>'
+            f'<div style="text-align:center;font-size:24px;font-weight:700;'
+            f'letter-spacing:3px;margin-top:2px">{verdict}</div>'
+            f'<hr style="margin:14px 0">'
+            f'<div style="font-weight:600;margin-bottom:2px">How the room ended up</div>'
+            f"{cards}"
+        ),
+        visible=True,
+    )
+
+
+def buttons(active):
+    """(act, reset) button states. While playing, act is the bright primary; once the tale
+    is told, act greys out and New game becomes the obvious next move."""
+    if active:
+        return (
+            gr.update(interactive=True, variant="primary"),
+            gr.update(variant="secondary"),
+        )
+    return (
+        gr.update(interactive=False, variant="secondary"),
+        gr.update(variant="primary"),
+    )
+
+
+BLANK_STORY = (
+    "*Author a scenario in **✨ Create your own**, then press **Play it ▶** "
+    "— it opens here.*"
+)
+
+
+def turn_outputs(scen, game, *, box, status=None, current=None):
+    """The seven per-turn outputs in build_game_ui's turn_outs order, for a live game.
+    `box` is the input update; `status` and `current` override the defaults for the
+    live-streaming frame (a fixed think cue and the in-progress speaker). The transcript it
+    renders already carries the inline ↻ regenerate links, so there's no separate rewind UI."""
+    return (
+        render_story(scen, game, current),
+        progress(scen, game) if status is None else status,
+        box,
+        game,
+        *buttons(game.active),
+        end_screen(scen, game),
+    )
+
+
+def fresh_turn(scen):
+    """The seven per-turn outputs for a brand-new game of `scen`, or a blank shell when
+    `scen` is None (the custom tab before anything is loaded into it)."""
+    if scen is None:
+        return (
+            BLANK_STORY,
+            "",
+            gr.update(value="", visible=False),
+            None,
+            *buttons(False),
+            gr.update(value="", visible=False),
+        )
+    return turn_outputs(scen, new_game(scen), box=gr.update(value="", visible=True))
