@@ -13,14 +13,45 @@ from scenarios import REGISTRY
 
 PLAY_TAB_ID = "play_custom"
 
+# The page chrome sits straight on the scene backdrop. The big title gets a white
+# text-shadow edge (outline-by-shadow renders everywhere, unlike -webkit-text-stroke
+# which eats into the glyphs); at tab-label sizes an outline just smudges, so the tab
+# row gets a frosted translucent strip behind it instead and keeps its own typography.
+
+
+def white_edge(r):
+    """A text-shadow outline: 8 white shadows ringing the glyph at radius `r` px."""
+    return ",".join(
+        f"{dx}px {dy}px 0 #fff" for dx in (-r, 0, r) for dy in (-r, 0, r) if dx or dy
+    )
+
+
+NAV_CSS = (
+    f".rtr-title h1{{color:#111;text-shadow:{white_edge(1)},{white_edge(2)}}}"
+    ".tab-container{background:rgba(255,255,255,.72);backdrop-filter:blur(8px);"
+    "border-radius:10px;padding:0 10px}"
+    ".tab-container button:not(.selected){color:#111}"
+)
+
+# Gradio's footer Settings panel doesn't work well here — hide it (and its divider dot),
+# keeping "Use via API" and the Gradio credit.
+FOOTER_CSS = (
+    "footer button.settings,footer .divider:not(.show-api-divider)"
+    "{display:none !important}"
+)
+
 
 def do_load(scen):
     """Switch to the Play tab and fill it with the freshly parsed scenario."""
     return (gr.update(selected=PLAY_TAB_ID), *gameview.load_into_play(scen))
 
 
-with gr.Blocks(title="Read the Room", css=gameview.HIDE_CSS) as demo:
-    gr.Markdown("# 🎭 Read the Room")
+with gr.Blocks(
+    title="Read the Room",
+    theme=gr.themes.Soft(primary_hue="indigo"),
+    css=gameview.HIDE_CSS + gameview.BG_CSS + NAV_CSS + FOOTER_CSS,
+) as demo:
+    gr.Markdown("# Read the Room", elem_classes="rtr-title")
     with gr.Tabs() as tabs:
         for scen in REGISTRY.values():
             gameview.build_game(scen)
@@ -37,5 +68,4 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        theme=gr.themes.Soft(primary_hue="amber"),
     )

@@ -163,16 +163,14 @@ def progress(scen, game):
 
 
 def room_strip(scen):
-    """The scene banner shown above the story — only when the scenario carries a real image;
-    otherwise nothing. The cast appear inline as they speak in the transcript, and how they
-    finally read you is the end screen."""
+    """The scene art as a full-page backdrop behind the story (`.rtr-bg`, styled in
+    gameview.BG_CSS) — only when the scenario carries a real image; otherwise nothing and
+    the plain page stands. The cast appear inline as they speak in the transcript, and how
+    they finally read you is the end screen."""
     uri = scene_uri(scen)
     if not uri:
         return ""
-    return (
-        f'<img src="{uri}" '
-        f'style="width:100%;max-height:200px;object-fit:cover;border-radius:14px"/>'
-    )
+    return f'<div class="rtr-bg" style="background-image:url({uri})"></div>'
 
 
 def _web_rows(scen, game, c):

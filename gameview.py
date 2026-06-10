@@ -29,6 +29,18 @@ REGEN_CAP = (
 # instead — still rendered, still clickable, just not painted. Wired into the Blocks in app.py.
 HIDE_CSS = ".rtr-regen-hide{display:none !important}"
 
+# The scene art is a fixed full-viewport backdrop (`.rtr-bg`, emitted by render.room_strip)
+# that hides along with its tab. The page container goes transparent so the backdrop shows
+# through, and a game that carries one gets a translucent card behind its text to stay
+# readable. Games without art keep the plain page. Wired into the Blocks in app.py.
+BG_CSS = (
+    ".rtr-bg{position:fixed;inset:0;z-index:-1;"
+    "background-size:cover;background-position:center}"
+    "gradio-app,.gradio-container{background:transparent !important}"
+    ".rtr-game:has(.rtr-bg){background:rgba(255,255,255,.64);"
+    "padding:8px 20px 20px;border-radius:14px}"
+)
+
 
 def build_game_ui(scen=None):
     """The playable game for one scenario: the room, the transcript, the input, and the
