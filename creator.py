@@ -18,6 +18,7 @@ from scenarios.format import Character, Scenario
 
 
 DEFAULT_LABELS = ["WON", "LOST"]
+MIN_TURNS = 3  # fewer turns than this and the social arc has no room to develop
 
 
 class CharSpec(BaseModel):
@@ -63,7 +64,7 @@ class AuthorScenario(dspy.Signature):
     `intro` is present tense and addresses the player directly as "you": a few tight sentences
     of pure setup that put the player in the room, name the stakes, and end where the player's
     first words begin. `goal` is a concrete win condition the room visibly grants once the
-    player earns it."""
+    player earns it. `max_turns` gives the player room to work: at least 3, typically 5-8."""
 
     idea: str = dspy.InputField(
         desc="the player's one- or two-line premise for the scenario"
@@ -189,6 +190,8 @@ def spec_to_scenario(spec, art=None):
     an authored scenario shows its own pictures (absent -> the usual placeholders)."""
     if not spec.characters:
         raise ValueError("a scenario needs at least one character")
+    if spec.max_turns < MIN_TURNS:
+        raise ValueError(f"a game lasts at least {MIN_TURNS} turns")
     art = art or {}
     labels = verdict_pair(spec)
     # normalize every disposition to the canonical row (Player + each name, incl. self), so an

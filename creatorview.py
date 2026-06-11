@@ -271,7 +271,12 @@ def build_creator():
         with gr.Row():
             goal = gr.Textbox(label="Goal — the win condition", lines=2, scale=3)
             max_turns = gr.Slider(
-                1, 12, value=blank.max_turns, step=1, label="Max turns", scale=1
+                creator.MIN_TURNS,
+                12,
+                value=blank.max_turns,
+                step=1,
+                label="Max turns",
+                scale=1,
             )
         gr.Markdown("#### The cast")
         groups, names, personas = [], [], []
