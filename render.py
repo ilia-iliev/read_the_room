@@ -30,7 +30,12 @@ PROMPT_TO_SPEAK = "*The room turns to you. What do you say?*"
 
 # Inline rewind links on each of the player's past lines. Each turn index has its own hidden
 # button (`.rtr-regen-N` / `.rtr-edit-N`, wired in gameview.py), so the link just confirms and
-# clicks that button — no value passes through the frontend.
+# clicks that button — no value passes through the frontend. These prefixes are the contract
+# between the links here and the hidden buttons gameview builds.
+REGEN_CLS = "rtr-regen"
+EDIT_CLS = "rtr-edit"
+
+
 def _click_hidden(cls, confirm):
     """JS for an inline link: confirm, then click THIS game's hidden `.cls` button (scoped to the
     nearest `.rtr-game`, so the right game answers even with several game tabs in the page)."""
@@ -56,7 +61,7 @@ def _inline_link(cls_prefix, turn_no, icon, title, confirm):
 def regen_link(turn_no):
     """↻ — rewind to this turn and replay it with the SAME words, fresh reactions."""
     return _inline_link(
-        "rtr-regen",
+        REGEN_CLS,
         turn_no,
         "↻",
         "Rewind &amp; regenerate from here",
@@ -67,7 +72,7 @@ def regen_link(turn_no):
 def edit_link(turn_no):
     """✎ — rewind to this turn and drop the original words back in the box to reword first."""
     return _inline_link(
-        "rtr-edit",
+        EDIT_CLS,
         turn_no,
         "✎",
         "Rewind &amp; edit this line",

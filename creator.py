@@ -10,6 +10,7 @@ import uuid
 import dspy
 from pydantic import BaseModel, Field
 
+import bundle
 import engine
 from art import slug
 from scenarios.format import Character, Scenario
@@ -102,7 +103,7 @@ AUTHOR_LM = engine.make_lm(0.8, max_tokens=3000)
 def missing_cells(spec):
     """Every (character, toward) disposition cell with no clause — small authoring models
     drop some even when told not to, typically the roster's last name."""
-    keys = ["Player", *[c.name for c in spec.characters]]
+    keys = engine.row_keys(spec)
     return [
         (c.name, k)
         for c in spec.characters
@@ -151,9 +152,25 @@ def from_json(text):
     return ScenarioSpec.model_validate_json(text)
 
 
+def load_bundle(zip_path):
+    """A saved bundle back as `(spec, art)` — the one parse boundary every loader shares.
+    Raises on anything that isn't a bundle or doesn't hold a valid spec."""
+    spec_text, art = bundle.unpack(zip_path)
+    return from_json(spec_text), art
+
+
+def verdict_pair(spec):
+    """The spec's verdict labels normalized to exactly [win, lose]: defaulted when empty,
+    a single label standing for both."""
+    labels = spec.verdict_labels or list(DEFAULT_LABELS)
+    return [labels[0], labels[-1]]
+
+
 def blank_spec(num_characters):
     names = [f"Character {i + 1}" for i in range(num_characters)]
-    keys = ["Player", *names]  # show the matrix shape: a cell per party, incl. self
+    keys = engine.party_keys(
+        names
+    )  # show the matrix shape: a cell per party, incl. self
     return ScenarioSpec(
         characters=[
             CharSpec(name=n, disposition=dict.fromkeys(keys, "")) for n in names
@@ -168,9 +185,7 @@ def spec_to_scenario(spec, art=None):
     if not spec.characters:
         raise ValueError("a scenario needs at least one character")
     art = art or {}
-    labels = spec.verdict_labels or list(DEFAULT_LABELS)
-    if len(labels) < 2:
-        labels = [labels[0], labels[0]]
+    labels = verdict_pair(spec)
     # normalize every disposition to the canonical row (Player + each name, incl. self), so an
     # author/edited spec that filled only some cells still loads with a complete, gap-free matrix.
     keys = engine.row_keys(spec)

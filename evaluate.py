@@ -216,7 +216,7 @@ class DriverCase:
     room: str
     expect: set  # acceptable `outcome` values
     note: str
-    player_so_far: str = "(first move — nothing said yet)"
+    player_so_far: str = engine.FIRST_MOVE
     final_turn: bool = False  # the clock-cap turn: the referee must commit won/lost
 
 

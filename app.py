@@ -7,7 +7,6 @@ which hands a freshly parsed Scenario to the dedicated Play tab.
 
 import gradio as gr
 
-import bundle
 import creator
 import creatorview
 import gameview
@@ -51,8 +50,8 @@ def do_load(scen):
 def load_bundle(zip_path):
     """Open a saved bundle straight in the Play tab — no detour through the editor."""
     try:
-        spec_text, art = bundle.unpack(zip_path)
-        scen = creator.spec_to_scenario(creator.from_json(spec_text), art)
+        spec, art = creator.load_bundle(zip_path)
+        scen = creator.spec_to_scenario(spec, art)
     except Exception as e:  # not a bundle / spec inside is invalid — surface as a toast
         raise gr.Error(f"Couldn't load that bundle: {e}")
     return gameview.load_into_play(scen)

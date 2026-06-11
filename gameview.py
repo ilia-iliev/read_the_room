@@ -10,7 +10,9 @@ import gradio as gr
 from engine import new_game, play_turn_stream, rewind_to
 from render import (
     BLANK_STORY,
+    EDIT_CLS,
     PLAYER_VERB,
+    REGEN_CLS,
     export_debug,
     fresh_turn,
     progress,
@@ -86,12 +88,12 @@ def build_game_ui(scen=None):
         # rewind to ITS turn. The link clicks the matching `.rtr-regen-N`; nothing is passed
         # through the frontend, so there's no value to lose. No on-screen rewind UI.
         regen_btns = [
-            gr.Button(elem_classes=[f"rtr-regen-{i}", "rtr-regen-hide"])
+            gr.Button(elem_classes=[f"{REGEN_CLS}-{i}", "rtr-regen-hide"])
             for i in range(REGEN_CAP)
         ]
         # the ✎ twin of regen_btns: rewind to ITS turn but prefill the box instead of replaying
         edit_btns = [
-            gr.Button(elem_classes=[f"rtr-edit-{i}", "rtr-regen-hide"])
+            gr.Button(elem_classes=[f"{EDIT_CLS}-{i}", "rtr-regen-hide"])
             for i in range(REGEN_CAP)
         ]
 
@@ -118,17 +120,25 @@ def build_game_ui(scen=None):
         box = gr.update(value="", visible=False) if not game.active else ""
         yield turn_outputs(scen, game, box=box)
 
+    def rewind_bail(game, scen, turn_no):
+        """The early-out frame when a rewind can't run — a blank shell when nothing is
+        loaded, a no-op frame when the turn no longer exists — or None when it's valid.
+        The one guard both rewind paths (↻ replay and ✎ edit) share."""
+        if scen is None or game is None:
+            return fresh_turn(None)
+        if not (0 <= turn_no < len(game.snapshots)):
+            return turn_outputs(scen, game, box=gr.update())  # turn no longer exists
+        return None
+
     def make_regenerate(turn_no):
         """A handler bound to one turn index: rewind to player turn `turn_no` (dropping it and
         everything after) and replay it with the same words. The play LM has caching off, so the
         room reacts anew rather than echoing the original — same streaming path as a fresh Say."""
 
         async def regenerate(game, scen):
-            if scen is None or game is None:
-                yield fresh_turn(None)
-                return
-            if not (0 <= turn_no < len(game.snapshots)):
-                yield turn_outputs(scen, game, box=gr.update())  # turn no longer exists
+            bail = rewind_bail(game, scen, turn_no)
+            if bail is not None:
+                yield bail
                 return
             directive = rewind_to(game, turn_no)
             async for out in play_forward(scen, game, directive):
@@ -142,12 +152,9 @@ def build_game_ui(scen=None):
         can reword before pressing Say. Rewind-only — no streaming — so it's a plain sync return."""
 
         def edit(game, scen):
-            if scen is None or game is None:
-                return fresh_turn(None)
-            if not (0 <= turn_no < len(game.snapshots)):
-                return turn_outputs(
-                    scen, game, box=gr.update()
-                )  # turn no longer exists
+            bail = rewind_bail(game, scen, turn_no)
+            if bail is not None:
+                return bail
             directive = rewind_to(game, turn_no)
             return turn_outputs(
                 scen, game, box=gr.update(value=directive, visible=True)

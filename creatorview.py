@@ -10,6 +10,7 @@ import pandas as pd
 
 import bundle
 import creator
+import engine
 from art import slug
 
 MAX_CAST = 6  # the editor pre-builds this many character cards and shows the live ones
@@ -19,8 +20,7 @@ WHO = "Who"  # the grid's display-only first column; cells are read by position,
 def grid_value(characters):
     """The disposition matrix as a grid: one row per character (first cell their name), then
     one cell per party — Player plus every name; a character's own column is their mood."""
-    names = [c.name for c in characters]
-    keys = ["Player", *names]
+    keys = engine.party_keys([c.name for c in characters])
     rows = [[c.name, *(c.disposition.get(k, "") for k in keys)] for c in characters]
     return pd.DataFrame(rows, columns=[WHO, *keys])
 
@@ -66,7 +66,7 @@ def assemble(title, intro, goal, max_turns, win, lose, grid, cast, *fields):
     then the MAX_CAST persona boxes; the first len(cast) of each are live. Grid cells are
     read by position, so its headers stay display-only."""
     names = named(fields, len(cast))
-    keys = ["Player", *names]
+    keys = engine.party_keys(names)
     characters = [
         creator.CharSpec(
             name=name,
@@ -95,9 +95,7 @@ def assemble(title, intro, goal, max_turns, win, lose, grid, cast, *fields):
 def filled(spec, art):
     """The full creator output row for a freshly loaded spec."""
     chars = spec.characters
-    labels = spec.verdict_labels
-    win = labels[0] if labels else creator.DEFAULT_LABELS[0]
-    lose = labels[1] if len(labels) > 1 else creator.DEFAULT_LABELS[1]
+    win, lose = creator.verdict_pair(spec)
     shown = [gr.update(visible=i < len(chars)) for i in range(MAX_CAST)]
     names = [chars[i].name if i < len(chars) else "" for i in range(MAX_CAST)]
     personas = [chars[i].persona if i < len(chars) else "" for i in range(MAX_CAST)]
@@ -141,8 +139,7 @@ def load_handler(zip_path):
     if not zip_path:
         return abort("⬆️ Pick a .zip bundle.")
     try:
-        spec_text, art = bundle.unpack(zip_path)
-        spec = creator.from_json(spec_text)
+        spec, art = creator.load_bundle(zip_path)
     except (
         Exception
     ) as e:  # not a bundle / spec inside is invalid — surface it, keep the editor as-is

@@ -109,16 +109,25 @@ class Game:
 # convention: a narrated 'you' is always the player, never the character being voiced.
 NARRATOR = "NARRATOR (to the player):"
 
+# what the referee reads for `player_so_far` before any prior turn is banked; the eval
+# fixtures stage the same placeholder so they exercise the real prompt
+FIRST_MOVE = "(first move — nothing said yet)"
+
 
 def norm_label(text):
     """Normalize a model-emitted label for comparison: lowercased, trailing period stripped."""
     return text.strip().lower().rstrip(".")
 
 
+def party_keys(names):
+    """The canonical disposition keys a row carries, in canonical order: the player first,
+    then every character name (a character's own name is its self/diagonal entry)."""
+    return ["Player", *names]
+
+
 def row_keys(scen):
-    """The canonical disposition keys every character's row carries: the player plus every
-    character name (a character's own name is its self/diagonal entry)."""
-    return ["Player", *[c.name for c in scen.characters]]
+    """party_keys over a scenario's (or spec's) cast."""
+    return party_keys([c.name for c in scen.characters])
 
 
 def disposition_model(keys):
@@ -411,9 +420,7 @@ async def play_turn_stream(game, directive):
     this_turn = model_transcript(game.log[turn_start:])
     room = render_room(scen, moved, game.chars)
     prior = [e.text for e in game.log[:turn_start] if e.kind == "player"]
-    player_so_far = (
-        "\n".join(f"- {t}" for t in prior) or "(first move — nothing said yet)"
-    )
+    player_so_far = "\n".join(f"- {t}" for t in prior) or FIRST_MOVE
 
     # the referee is the SOLE judge: it rules before anyone narrates, so a later beat can never
     # second-guess the verdict. On the final turn it must commit — no 'ongoing' past the clock.
