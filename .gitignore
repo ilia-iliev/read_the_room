@@ -15,6 +15,7 @@ wheels/
 
 # Local-only Claude Code settings
 .claude/settings.local.json
+.claude/worktrees/
 CLAUDE.md
 
 # Local-only lockfile
