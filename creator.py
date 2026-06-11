@@ -1,19 +1,20 @@
 """Promptable scenario authoring: `author` runs one model call that fills a `ScenarioSpec`
 (the same shape the hand-written scenarios have). The creator view edits the spec as a
 form — or starts from a blank template — and it round-trips through JSON only for
-bundling, before it becomes a live `Scenario`. The fairness rules live in the shared STAGE_RULES (scenarios/format.py), so
-the author invents only the cast and the situation, never the glue.
+saving to a shareable .txt, before it becomes a live `Scenario`. The fairness rules live
+in the shared STAGE_RULES (scenarios/format.py), so the author invents only the cast and
+the situation, never the glue.
 """
 
+import tempfile
 import uuid
+from pathlib import Path
 
 import dspy
 from pydantic import BaseModel, Field
 
-import bundle
 import dispositions
 import engine
-from art import slug
 from scenarios.format import Character, Scenario
 
 
@@ -158,11 +159,17 @@ def from_json(text):
     return ScenarioSpec.model_validate_json(text)
 
 
-def load_bundle(zip_path):
-    """A saved bundle back as `(spec, art)` — the one parse boundary every loader shares.
-    Raises on anything that isn't a bundle or doesn't hold a valid spec."""
-    spec_text, art = bundle.unpack(zip_path)
-    return from_json(spec_text), art
+def load_spec(path):
+    """A saved scenario file back as a spec — the one parse boundary every loader shares.
+    Raises on anything that doesn't hold a valid spec."""
+    return from_json(Path(path).read_text(encoding="utf-8"))
+
+
+def save_spec(spec):
+    """The spec serialized to a shareable .txt (the spec JSON); returns the file's path."""
+    out = Path(tempfile.mkdtemp()) / "scenario.txt"
+    out.write_text(to_json(spec), encoding="utf-8")
+    return str(out)
 
 
 def verdict_pair(spec):
@@ -184,15 +191,12 @@ def blank_spec(num_characters):
     )
 
 
-def spec_to_scenario(spec, art=None):
-    """Build a live Scenario. `art` is the creator UI's mapping of 'scene' and character
-    slugs to uploaded image filepaths; matching entries become inline art on the objects so
-    an authored scenario shows its own pictures (absent -> the usual placeholders)."""
+def spec_to_scenario(spec):
+    """Build a live Scenario from an authored/edited spec."""
     if not spec.characters:
         raise ValueError("a scenario needs at least one character")
     if spec.max_turns < MIN_TURNS:
         raise ValueError(f"a game lasts at least {MIN_TURNS} turns")
-    art = art or {}
     labels = verdict_pair(spec)
     # normalize every disposition to the canonical row (Player + each name, incl. self), so an
     # author/edited spec that filled only some cells still loads with a complete, gap-free matrix.
@@ -202,7 +206,6 @@ def spec_to_scenario(spec, art=None):
             name=c.name,
             persona=c.persona,
             disposition=dispositions.merge_row({}, c.disposition, keys),
-            avatar=art.get(slug(c.name), ""),
         )
         for c in spec.characters
     ]
@@ -214,5 +217,4 @@ def spec_to_scenario(spec, art=None):
         characters=chars,
         max_turns=spec.max_turns,
         verdict_labels=labels,
-        scene_image=art.get("scene", ""),
     )

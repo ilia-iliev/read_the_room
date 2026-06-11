@@ -1,16 +1,14 @@
 """The 'Create your own' view: a scenario form that starts preloaded with a blank template
 — premise fields, one card per character, the disposition matrix as an editable grid. Fill
-it by hand, or let the AI author the whole thing from a one-line idea. Attach art, bundle
-it, and hand the parsed Scenario off to the Play tab. Nobody edits raw JSON here; Download
-bundle still serializes the spec.
+it by hand, or let the AI author the whole thing from a one-line idea. Save it as a
+shareable .txt, and hand the parsed Scenario off to the Play tab. Nobody edits raw JSON
+here; Save still serializes the spec.
 """
 
 import gradio as gr
 import pandas as pd
 
-import bundle
 import creator
-from art import slug
 from dispositions import party_keys
 
 MAX_CAST = 6  # the editor pre-builds this many character cards and shows the live ones
@@ -89,10 +87,9 @@ def assemble(title, intro, goal, max_turns, win, lose, grid, cast, *fields):
 
 
 # authoring and loading fill the same outputs: a status line (errors only — success is
-# silent, the form filling in IS the feedback), every premise field, the grid, the cast
-# (drives the avatar uploaders), the art mapping, the scene banner, and the MAX_CAST card
-# slots (visibility, name, persona).
-def filled(spec, art):
+# silent, the form filling in IS the feedback), every premise field, the grid, the cast,
+# and the MAX_CAST card slots (visibility, name, persona).
+def filled(spec):
     """The full creator output row for a freshly loaded spec."""
     chars = spec.characters
     win, lose = creator.verdict_pair(spec)
@@ -109,8 +106,6 @@ def filled(spec, art):
         lose,
         grid_update(grid_value(chars)),
         [c.name for c in chars],
-        art,
-        art.get("scene"),
         *shown,
         *names,
         *personas,
@@ -119,7 +114,7 @@ def filled(spec, art):
 
 def abort(msg):
     """Leave the editor untouched and just show a status line."""
-    return (msg, *(gr.update(),) * (10 + 3 * MAX_CAST))
+    return (msg, *(gr.update(),) * (8 + 3 * MAX_CAST))
 
 
 def author_handler(idea, n):
@@ -132,37 +127,33 @@ def author_handler(idea, n):
         Exception
     ) as e:  # malformed model output / parse failure — show it, don't crash
         return abort(f"❌ Authoring failed: {e}")
-    return filled(spec, {})
+    return filled(spec)
 
 
-def load_handler(zip_path):
-    if not zip_path:
-        return abort("⬆️ Pick a .zip bundle.")
+def load_handler(path):
+    if not path:
+        return abort("⬆️ Pick a scenario .txt.")
     try:
-        spec, art = creator.load_bundle(zip_path)
+        spec = creator.load_spec(path)
     except (
         Exception
-    ) as e:  # not a bundle / spec inside is invalid — surface it, keep the editor as-is
-        return abort(f"❌ Couldn't load that bundle: {e}")
+    ) as e:  # not a spec / invalid spec — surface it, keep the editor as-is
+        return abort(f"❌ Couldn't load that scenario: {e}")
     if len(spec.characters) > MAX_CAST:
         return abort(f"❌ This editor holds up to {MAX_CAST} characters.")
-    return filled(spec, art)
+    return filled(spec)
 
 
-def rename_handler(cast_now, art, grid, *names):
-    """Live rename: the cast list, the grid headers, and the art keys all follow the name
-    boxes; every disposition cell survives by position."""
+def rename_handler(cast_now, grid, *names):
+    """Live rename: the cast list and the grid headers follow the name boxes; every
+    disposition cell survives by position."""
     new = named(names, len(cast_now))
-    art = dict(art)
-    for old, name in zip(cast_now, new):
-        if name != old and slug(old) in art:
-            art[slug(name)] = art.pop(slug(old))
-    return new, art, grid_update(rebuild_grid(grid, new))
+    return new, grid_update(rebuild_grid(grid, new))
 
 
-# add/remove both write the same outputs: cast, art, grid, and every card slot.
+# add/remove both write the same outputs: cast, grid, and every card slot.
 def cards_noop():
-    return (gr.update(),) * (3 + 3 * MAX_CAST)
+    return (gr.update(),) * (2 + 3 * MAX_CAST)
 
 
 def add_handler(cast_now, grid):
@@ -178,7 +169,6 @@ def add_handler(cast_now, grid):
     personas = ["" if i == k else gr.update() for i in range(MAX_CAST)]
     return (
         new,
-        gr.update(),
         grid_update(rebuild_grid(grid, new)),
         *shown,
         *names,
@@ -186,19 +176,16 @@ def add_handler(cast_now, grid):
     )
 
 
-def remove_handler(cast_now, art, grid):
+def remove_handler(cast_now, grid):
     if len(cast_now) <= 1:  # a scenario needs at least one character
         return cards_noop()
     new = list(cast_now[:-1])
-    art = dict(art)
-    art.pop(slug(cast_now[-1]), None)
     shown = [
         gr.update(visible=False) if i == len(new) else gr.update()
         for i in range(MAX_CAST)
     ]
     return (
         new,
-        art,
         grid_update(rebuild_grid(grid, new)),
         *shown,
         *cards_noop()[: 2 * MAX_CAST],
@@ -206,35 +193,24 @@ def remove_handler(cast_now, art, grid):
 
 
 def parse_or_raise(*args):
-    """Build the Scenario the player is about to play from the form (art rides last), or
-    raise a toast they can read. The .success() chain only fires on a clean parse, so the
-    Play tab is never half-filled."""
+    """Build the Scenario the player is about to play from the form, or raise a toast they
+    can read. The .success() chain only fires on a clean parse, so the Play tab is never
+    half-filled."""
     try:
-        return creator.spec_to_scenario(assemble(*args[:-1]), args[-1])
+        return creator.spec_to_scenario(assemble(*args))
     except Exception as e:  # invalid / incomplete spec — surface the reason as a toast
         raise gr.Error(f"Couldn't load this spec: {e}")
 
 
-def pack_handler(*args):
-    """Serialize the form to the spec JSON and zip it with the art."""
-    return bundle.pack(creator.to_json(assemble(*args[:-1])), args[-1])
-
-
-def set_art(current, key, path):
-    """Update the in-session art mapping: bind `key` to the uploaded `path`, or drop it when
-    the slot is cleared. Absent slots fall back to the generated placeholders."""
-    current = dict(current)
-    if path:
-        current[key] = path
-    else:
-        current.pop(key, None)
-    return current
+def save_handler(*args):
+    """Serialize the form to the spec JSON and hand back a downloadable .txt."""
+    return creator.save_spec(assemble(*args))
 
 
 def build_creator():
     """A tab with the scenario form, preloaded blank, that the AI can fill from a one-line
     idea; pressing Play hands it to the dedicated Play tab. Returns the refs the top-level
-    needs to wire that handoff: (play_btn, form_inputs, art)."""
+    needs to wire that handoff: (play_btn, form_inputs)."""
     blank = creator.blank_spec(3)
     with gr.Tab("✨ Create your own"):
         gr.Markdown(
@@ -262,7 +238,7 @@ def build_creator():
         with gr.Row():
             author_btn = gr.Button("Author with AI ✨", variant="primary")
             load_btn = gr.UploadButton(
-                "⬆️ Load bundle (.zip)", file_types=[".zip"], type="filepath"
+                "⬆️ Load scenario (.txt)", file_types=[".txt"], type="filepath"
             )
         status = gr.Markdown()
 
@@ -323,40 +299,14 @@ def build_creator():
                 label="Verdict when you lose", value=creator.DEFAULT_LABELS[1]
             )
 
-        # art rides along with the spec: 'scene' + one entry per character slug -> a
-        # filepath. absent slots fall back to the generated placeholders. cast drives
-        # the uploader layout.
-        art = gr.State({})
         cast = gr.State([c.name for c in blank.characters])
-        with gr.Accordion(
-            "🎨 Art (optional) — pictures bundle with the scenario", open=False
-        ):
-            scene_img = gr.Image(label="Scene banner", type="filepath", height=160)
-
-            @gr.render(inputs=[cast, art])
-            def render_avatars(cast_now, art_now):
-                with gr.Row():
-                    for name in cast_now:
-                        s = slug(name)
-                        pic = gr.Image(
-                            label=name,
-                            type="filepath",
-                            height=140,
-                            value=art_now.get(s),
-                        )
-                        pic.change(
-                            lambda path, current, s=s: set_art(current, s, path),
-                            [pic, art],
-                            art,
-                        )
-
         with gr.Row():
             play_btn = gr.Button("Play it ▶", variant="primary", scale=3)
-            download_btn = gr.DownloadButton("⬇️ Download bundle (.zip)", scale=1)
+            download_btn = gr.DownloadButton("⬇️ Save scenario (.txt)", scale=1)
 
         form_inputs = [title, intro, goal, max_turns, win, lose, grid, cast]
         form_inputs += [*names, *personas]
-        outputs = [status, *form_inputs[:7], cast, art, scene_img]
+        outputs = [status, *form_inputs[:7], cast]
         outputs += [*groups, *names, *personas]
 
         # everything the player could press or type locks while the AI authors, so a
@@ -382,15 +332,10 @@ def build_creator():
         load_btn.upload(load_handler, [load_btn], outputs)
         # .input (not .change) so programmatic fills don't echo back through the handler
         for nm in names:
-            nm.input(rename_handler, [cast, art, grid, *names], [cast, art, grid])
-        card_outputs = [cast, art, grid, *groups, *names, *personas]
+            nm.input(rename_handler, [cast, grid, *names], [cast, grid])
+        card_outputs = [cast, grid, *groups, *names, *personas]
         add_btn.click(add_handler, [cast, grid], card_outputs)
-        remove_btn.click(remove_handler, [cast, art, grid], card_outputs)
-        scene_img.change(
-            lambda path, current: set_art(current, "scene", path),
-            [scene_img, art],
-            art,
-        )
-        download_btn.click(pack_handler, [*form_inputs, art], download_btn)
+        remove_btn.click(remove_handler, [cast, grid], card_outputs)
+        download_btn.click(save_handler, form_inputs, download_btn)
 
-    return play_btn, form_inputs, art
+    return play_btn, form_inputs

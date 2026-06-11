@@ -9,9 +9,8 @@ Art is CONVENTION, not configuration. Drop files under `scenarios/assets/<scenar
 
 If a file is there it's used; if not, an avatar falls back to a generated coloured initial
 disc and a scene banner is simply not shown — real art swaps in just by adding a file.
-Authored (Create-your-own) scenarios have transient ids and no asset folder, so they carry
-their art inline instead (a filepath on the Scenario/Character, which takes priority over
-the on-disk lookup) and bundle it on download; see bundle.py.
+Authored (Create-your-own) scenarios have transient ids and no asset folder, so they get
+the generated placeholders.
 """
 
 import base64
@@ -91,25 +90,15 @@ def _avatar_svg(initial, color):
     )
 
 
-def _inline_uri(path):
-    """An inline-art filepath carried on the scenario as a data URI, or None when unset or
-    gone (authored scenarios keep their art as filepaths so it can be bundled on download)."""
-    p = Path(path) if path else None
-    return _file_uri(p) if p and p.is_file() else None
-
-
 def avatar_uri(scen, char):
-    """A round avatar for one character: the inline avatar if it carries one, else
-    `<scenario>/<name>.<ext>` on disk, else a coloured initial disc."""
-    return (
-        _inline_uri(char.avatar)
-        or _file_uri(_find(scen.id, slug(char.name)))
-        or _svg_uri(_avatar_svg(_initial(char.name), _color(char.name)))
+    """A round avatar for one character: `<scenario>/<name>.<ext>` on disk, else a
+    coloured initial disc."""
+    return _file_uri(_find(scen.id, slug(char.name))) or _svg_uri(
+        _avatar_svg(_initial(char.name), _color(char.name))
     )
 
 
 def scene_uri(scen):
-    """The scene banner: the inline banner if the scenario carries one, else
-    `<scenario>/scene.<ext>` on disk, else None — no banner is shown unless a real
-    image exists."""
-    return _inline_uri(scen.scene_image) or _file_uri(_find(scen.id, "scene"))
+    """The scene banner: `<scenario>/scene.<ext>` on disk, else None — no banner is
+    shown unless a real image exists."""
+    return _file_uri(_find(scen.id, "scene"))

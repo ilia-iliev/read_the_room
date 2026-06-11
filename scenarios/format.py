@@ -51,10 +51,6 @@ class Character:
     # (this character's own name is the self/diagonal entry — its current mood). One short
     # free-text clause per key. The engine threads and refreshes this row turn by turn.
     disposition: dict
-    # avatar art is convention, not config: scenarios/assets/<id>/<name>.png is picked up
-    # automatically (see art.py); absent -> an initial-disc placeholder. An inline filepath
-    # here overrides that, so an authored scenario can carry and bundle its own art.
-    avatar: str = ""
 
 
 @dataclass
@@ -74,7 +70,3 @@ class Scenario:
     # injected as instructions for the situation driver AND the finale — the narrator/judge,
     # not a character. Same fairness, framed for the impartial director.
     director_rules: str = DIRECTOR_RULES
-    # scene banner is convention, not config: scenarios/assets/<id>/scene.png is picked up
-    # automatically (see art.py); absent -> no banner. An inline filepath here overrides
-    # that, so an authored scenario can carry and bundle its own banner.
-    scene_image: str = ""

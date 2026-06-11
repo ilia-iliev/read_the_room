@@ -28,8 +28,6 @@ scenarios/assets/hero/
 
 ## Authored scenarios
 
-Create-your-own scenarios get a fresh random `id` each build and so have no folder here.
-Instead you add their art right in the **Create your own** tab (scene banner + one avatar
-per character), and **Download bundle** zips the spec together with those images — the same
-`scene.<ext>` / `<character>.<ext>` layout as above, so a downloaded bundle's art could even
-be dropped straight into a permanent folder here. **Load bundle** reads one back in.
+Create-your-own scenarios get a fresh random `id` each build and so have no folder here —
+they use the generated placeholders. To give one permanent art, save it, add it as a
+`scenarios/*.py` scenario with a fixed `id`, and drop images in a matching folder here.

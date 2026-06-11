@@ -244,7 +244,7 @@ def buttons(active):
 
 BLANK_STORY = (
     "*Author a scenario in **✨ Create your own**, then press **Play it ▶** "
-    "— it opens here. Already have a saved bundle? Load the `.zip` above.*"
+    "— it opens here. Already have a saved scenario? Load the `.txt` above.*"
 )
 
 

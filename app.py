@@ -47,13 +47,12 @@ def do_load(scen):
     return (gr.update(selected=PLAY_TAB_ID), *gameview.load_into_play(scen))
 
 
-def load_bundle(zip_path):
-    """Open a saved bundle straight in the Play tab — no detour through the editor."""
+def load_scenario(path):
+    """Open a saved scenario straight in the Play tab — no detour through the editor."""
     try:
-        spec, art = creator.load_bundle(zip_path)
-        scen = creator.spec_to_scenario(spec, art)
-    except Exception as e:  # not a bundle / spec inside is invalid — surface as a toast
-        raise gr.Error(f"Couldn't load that bundle: {e}")
+        scen = creator.spec_to_scenario(creator.load_spec(path))
+    except Exception as e:  # not a spec / invalid spec — surface as a toast
+        raise gr.Error(f"Couldn't load that scenario: {e}")
     return gameview.load_into_play(scen)
 
 
@@ -66,12 +65,12 @@ with gr.Blocks(
     with gr.Tabs() as tabs:
         for scen in REGISTRY.values():
             gameview.build_game(scen)
-        play_btn, form, art = creatorview.build_creator()
+        play_btn, form = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
             with gr.Row():
                 load_play = gr.UploadButton(
-                    "⬆️ Load bundle (.zip)",
-                    file_types=[".zip"],
+                    "⬆️ Load scenario (.txt)",
+                    file_types=[".txt"],
                     type="filepath",
                     size="sm",
                     scale=0,
@@ -80,10 +79,10 @@ with gr.Blocks(
             _scen_state, play_outs = gameview.build_game_ui()
 
     parse_state = gr.State()
-    play_btn.click(creatorview.parse_or_raise, [*form, art], parse_state).success(
+    play_btn.click(creatorview.parse_or_raise, form, parse_state).success(
         do_load, parse_state, [tabs, *play_outs]
     )
-    load_play.upload(load_bundle, load_play, play_outs)
+    load_play.upload(load_scenario, load_play, play_outs)
 
 if __name__ == "__main__":
     demo.launch(
