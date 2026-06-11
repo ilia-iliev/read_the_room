@@ -379,13 +379,9 @@ def evaluate_outcomes(referee, runs):
     return ok
 
 
-def find_char(scen, name):
-    return next(c for c in scen.characters if c.name.lower() == name.lower())
-
-
 def shift_passes(scen, case, actor, comparator):
     """Real character turn, then diff its before/after stance toward the player."""
-    char = find_char(scen, case.char)
+    char = next(c for c in scen.characters if c.name.lower() == case.char.lower())
     keys = engine.row_keys(scen)
     prev = engine.merge_row({}, case.disposition or char.disposition, keys)
     turn = actor(

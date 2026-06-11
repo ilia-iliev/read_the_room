@@ -310,14 +310,6 @@ def character_signature(scen):
     ).with_instructions(scen.stage_rules)
 
 
-def _actor(scen):
-    return _streamed(
-        dspy.Predict(character_signature(scen)),
-        "reasoning",
-        "line",
-    )
-
-
 async def _stream_beat(stream, field):
     """Drive a streamified single-field call, yielding the field's partial text as it grows.
     Each yield is (text, prediction): prediction is None while streaming and the final
@@ -380,13 +372,14 @@ async def play_turn_stream(game, directive):
     turn_start = len(game.log) - 1
 
     keys = row_keys(scen)
+    actor = _streamed(dspy.Predict(character_signature(scen)), "reasoning", "line")
     moved = {}  # name -> prior disposition ROW (A), for characters that spoke this turn
     for char in pick_speakers(game, directive):
         cs = game.chars[char.name]
         window = model_transcript(game.log[cs.last_spoke_at + 1 :])
         cur = {"name": char.name, "reasoning": "", "line": ""}
         updated = {}
-        async for chunk in _actor(scen)(
+        async for chunk in actor(
             persona=char.persona,
             disposition=render_row(char.name, cs.disposition, keys),
             scene=game.scene,
