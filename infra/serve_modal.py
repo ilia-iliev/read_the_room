@@ -2,21 +2,28 @@
 
 OpenAI-compatible endpoint; the game only needs RTR_API_BASE=https://<this app>.modal.run/v1
 and RTR_API_KEY. Scale-to-zero: idle costs nothing, the first request after idle pays the
-cold start (container boot + mmap of the GGUF from the Volume).
+cold start (container boot + mmap of the GGUF from the Volume). llama-server listens (and
+503s) while still loading, and Modal opens traffic as soon as a port accepts — so the
+public port is a readiness gate that binds only once /health passes, making cold-start
+requests queue at Modal's edge instead of failing.
 
 One-time:
     uv run --group infra modal setup
     uv run --group infra modal secret create rtr-api-key RTR_API_KEY=<random key>
     uv run --group infra modal run infra/serve_modal.py::download
-Deploy (env knobs: RTR_GPU=A10G|L40S, RTR_CTX):
+Deploy (env knobs: RTR_GPU, RTR_CTX — note the A10 OOMs on this config, L40S is the floor):
     uv run --group infra modal deploy infra/serve_modal.py
 
 Fallback to the Qwen GGUF the game was tuned on: set RTR_REPO/RTR_FILE/RTR_ALIAS at
 deploy time (drafter is skipped for non-Gemma models) and flip RTR_MODEL on the Space.
 """
 
+import http.client
 import os
+import socket
 import subprocess
+import threading
+import time
 
 import modal
 
@@ -43,7 +50,8 @@ ALIAS = os.getenv("RTR_ALIAS", "gemma-4-31B-it")
 
 GPU = os.getenv("RTR_GPU", "L40S")
 CTX = os.getenv("RTR_CTX", "65536")  # total across --parallel 4 slots -> 16K each
-PORT = 8081
+PORT = 8081  # public: bound by the readiness gate once the model is loaded
+LLAMA_PORT = 8082  # internal: llama-server, 503s while loading
 
 app = modal.App("read-the-room-server")
 
@@ -60,6 +68,38 @@ def download():
     if "gemma" in REPO:
         hf_hub_download(MTP_REPO, MTP_FILE, local_dir=MODELS_DIR)
     volume.commit()
+
+
+def _pipe(src, dst):
+    try:
+        while data := src.recv(1 << 16):
+            dst.sendall(data)
+    except OSError:
+        pass
+    finally:
+        for s in (src, dst):
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+
+def _gate():
+    while True:
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", LLAMA_PORT, timeout=2)
+            conn.request("GET", "/health")
+            if conn.getresponse().status == 200:
+                break
+        except OSError:
+            pass
+        time.sleep(2)
+    public = socket.create_server(("0.0.0.0", PORT))
+    while True:
+        client, _ = public.accept()
+        upstream = socket.create_connection(("127.0.0.1", LLAMA_PORT))
+        threading.Thread(target=_pipe, args=(client, upstream), daemon=True).start()
+        threading.Thread(target=_pipe, args=(upstream, client), daemon=True).start()
 
 
 @app.function(
@@ -97,9 +137,9 @@ def serve():
         "--api-key",
         os.environ["RTR_API_KEY"],
         "--host",
-        "0.0.0.0",
+        "127.0.0.1",
         "--port",
-        str(PORT),
+        str(LLAMA_PORT),
     ]
     if "gemma" in REPO:
         cmd += [
@@ -111,3 +151,4 @@ def serve():
             "4",
         ]
     subprocess.Popen(cmd)
+    threading.Thread(target=_gate, daemon=True).start()
