@@ -5,11 +5,15 @@ scenario in scenarios/ adds a tab here for free; `creatorview` is the author-you
 which hands a freshly parsed Scenario to the dedicated Play tab.
 """
 
+import threading
+import urllib.request
+
 import gradio as gr
 
 import creator
 import creatorview
 import gameview
+from engine import API_BASE
 from scenarios import REGISTRY
 
 PLAY_TAB_ID = "play_custom"
@@ -40,6 +44,22 @@ FOOTER_CSS = (
     "footer button.settings,footer .divider:not(.show-api-divider)"
     "{display:none !important}"
 )
+
+
+def warm_model():
+    """Ping the model endpoint so the Modal container boots while the user reads."""
+
+    def ping():
+        try:
+            # Held open on purpose: serve_modal's gate answers only once the model is
+            # loaded, and Modal cancels queued requests whose client disconnects.
+            urllib.request.urlopen(
+                API_BASE.removesuffix("/v1") + "/health", timeout=300
+            )
+        except OSError:
+            pass
+
+    threading.Thread(target=ping, daemon=True).start()
 
 
 def do_load(scen):
@@ -83,6 +103,7 @@ with gr.Blocks(
         do_load, parse_state, [tabs, *play_outs]
     )
     load_play.upload(load_scenario, load_play, play_outs)
+    demo.load(warm_model)
 
 if __name__ == "__main__":
     demo.launch(

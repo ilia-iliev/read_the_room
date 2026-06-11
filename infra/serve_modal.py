@@ -11,7 +11,7 @@ One-time:
     uv run --group infra modal setup
     uv run --group infra modal secret create rtr-api-key RTR_API_KEY=<random key>
     uv run --group infra modal run infra/serve_modal.py::download
-Deploy (env knobs: RTR_GPU, RTR_CTX — note the A10 OOMs on this config, L40S is the floor):
+Deploy (env knobs: RTR_GPU, RTR_CTX — note the A10 OOMs on this config; 24 GB cards are out):
     uv run --group infra modal deploy infra/serve_modal.py
 
 Fallback to the Qwen GGUF the game was tuned on: set RTR_REPO/RTR_FILE/RTR_ALIAS at
@@ -48,8 +48,13 @@ MTP_REPO = "unsloth/gemma-4-31B-it-qat-GGUF"
 MTP_FILE = "MTP/gemma-4-31B-it-Q8_0-MTP.gguf"
 ALIAS = os.getenv("RTR_ALIAS", "gemma-4-31B-it")
 
-GPU = os.getenv("RTR_GPU", "L40S")
+# A100-40GB: ~10% faster per verify step than L40S for +8% cost (measured — MTP verify
+# isn't purely bandwidth-bound). 64K ctx fits: ~22 GB used at 32K, KV is ~0.25 MiB/token.
+GPU = os.getenv("RTR_GPU", "A100-40GB")
 CTX = os.getenv("RTR_CTX", "65536")  # total across --parallel 4 slots -> 16K each
+# MTP draft depth. Measured knee: 3 -> 2.53 tokens/verify-step, 4 -> 2.86, 6 -> 2.76
+# (acceptance collapses to ~30% at 6). Don't raise it.
+SPEC_N = os.getenv("RTR_SPEC_N", "4")
 PORT = 8081  # public: bound by the readiness gate once the model is loaded
 LLAMA_PORT = 8082  # internal: llama-server, 503s while loading
 
@@ -102,8 +107,18 @@ def _gate():
         threading.Thread(target=_pipe, args=(upstream, client), daemon=True).start()
 
 
+# The module is re-imported inside the container, where the RTR_* deploy knobs aren't
+# set — bake the deploy-time values into the image env so serve() sees them.
 @app.function(
-    image=SERVER_IMAGE,
+    image=SERVER_IMAGE.env(
+        {
+            "RTR_REPO": REPO,
+            "RTR_FILE": MODEL_FILE,
+            "RTR_ALIAS": ALIAS,
+            "RTR_CTX": CTX,
+            "RTR_SPEC_N": SPEC_N,
+        }
+    ),
     gpu=GPU,
     volumes={MODELS_DIR: volume},
     secrets=[modal.Secret.from_name("rtr-api-key")],
@@ -148,7 +163,7 @@ def serve():
             "--spec-type",
             "draft-mtp",
             "--spec-draft-n-max",
-            "4",
+            SPEC_N,
         ]
     subprocess.Popen(cmd)
     threading.Thread(target=_gate, daemon=True).start()
