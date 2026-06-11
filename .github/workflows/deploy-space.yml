@@ -1,0 +1,13 @@
+name: Deploy to HF Space
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install huggingface_hub
+      - run: hf upload build-small-hackathon/read_the_room . . --repo-type=space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
