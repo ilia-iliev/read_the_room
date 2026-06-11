@@ -7,7 +7,8 @@ requires-python = ">=3.10"
 dependencies = [
     "gradio==6.16.0",
     "dspy==3.2.1",
-    "pydantic==2.13.4",
+    # <=2.12.5: HF Spaces install gradio[oauth,mcp], whose mcp extra caps pydantic
+    "pydantic==2.12.5",
 ]
 
 [dependency-groups]
