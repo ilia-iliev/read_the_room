@@ -11,6 +11,7 @@ import dspy
 from pydantic import BaseModel, Field
 
 import bundle
+import dispositions
 import engine
 from art import slug
 from scenarios.format import Character, Scenario
@@ -103,7 +104,7 @@ AUTHOR_LM = engine.make_lm(0.8, max_tokens=3000)
 def missing_cells(spec):
     """Every (character, toward) disposition cell with no clause — small authoring models
     drop some even when told not to, typically the roster's last name."""
-    keys = engine.row_keys(spec)
+    keys = dispositions.row_keys(spec)
     return [
         (c.name, k)
         for c in spec.characters
@@ -168,7 +169,7 @@ def verdict_pair(spec):
 
 def blank_spec(num_characters):
     names = [f"Character {i + 1}" for i in range(num_characters)]
-    keys = engine.party_keys(
+    keys = dispositions.party_keys(
         names
     )  # show the matrix shape: a cell per party, incl. self
     return ScenarioSpec(
@@ -188,12 +189,12 @@ def spec_to_scenario(spec, art=None):
     labels = verdict_pair(spec)
     # normalize every disposition to the canonical row (Player + each name, incl. self), so an
     # author/edited spec that filled only some cells still loads with a complete, gap-free matrix.
-    keys = engine.row_keys(spec)
+    keys = dispositions.row_keys(spec)
     chars = [
         Character(
             name=c.name,
             persona=c.persona,
-            disposition=engine.merge_row({}, c.disposition, keys),
+            disposition=dispositions.merge_row({}, c.disposition, keys),
             avatar=art.get(slug(c.name), ""),
         )
         for c in spec.characters

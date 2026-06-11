@@ -8,12 +8,11 @@ Each test fixes one input and asserts the one thing that must happen, every time
 """
 
 import engine
+from dispositions import disposition_model, merge_row
 from engine import (
     NARRATOR,
     Event,
     character_signature,
-    disposition_model,
-    merge_row,
     new_game,
     pick_speakers,
     model_transcript,

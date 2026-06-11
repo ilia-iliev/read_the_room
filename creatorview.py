@@ -10,8 +10,8 @@ import pandas as pd
 
 import bundle
 import creator
-import engine
 from art import slug
+from dispositions import party_keys
 
 MAX_CAST = 6  # the editor pre-builds this many character cards and shows the live ones
 WHO = "Who"  # the grid's display-only first column; cells are read by position, not header
@@ -20,7 +20,7 @@ WHO = "Who"  # the grid's display-only first column; cells are read by position,
 def grid_value(characters):
     """The disposition matrix as a grid: one row per character (first cell their name), then
     one cell per party — Player plus every name; a character's own column is their mood."""
-    keys = engine.party_keys([c.name for c in characters])
+    keys = party_keys([c.name for c in characters])
     rows = [[c.name, *(c.disposition.get(k, "") for k in keys)] for c in characters]
     return pd.DataFrame(rows, columns=[WHO, *keys])
 
@@ -66,7 +66,7 @@ def assemble(title, intro, goal, max_turns, win, lose, grid, cast, *fields):
     then the MAX_CAST persona boxes; the first len(cast) of each are live. Grid cells are
     read by position, so its headers stay display-only."""
     names = named(fields, len(cast))
-    keys = engine.party_keys(names)
+    keys = party_keys(names)
     characters = [
         creator.CharSpec(
             name=name,
