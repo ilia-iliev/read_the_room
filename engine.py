@@ -15,12 +15,15 @@ from dataclasses import dataclass, field
 
 import dspy
 
+from dotenv import load_dotenv
 from pydantic import ConfigDict, Field, create_model
 
 from signatures import CharacterTurn, Finale, Referee, SituationDriver
 
 # Any OpenAI-compatible server works: local vLLM/llama.cpp, or a hosted endpoint —
-# the HF Space sets these as secrets pointing at the Modal deployment. All required.
+# the HF Space sets these as secrets pointing at the Modal deployment. All required;
+# locally they come from .env, on the Space from its secrets (no .env there).
+load_dotenv()
 MODEL = "openai/" + os.getenv("RTR_MODEL")
 API_BASE = os.getenv("RTR_API_BASE")
 API_KEY = os.getenv("RTR_API_KEY")

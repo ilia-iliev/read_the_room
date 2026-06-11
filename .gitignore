@@ -19,3 +19,6 @@ CLAUDE.md
 
 # Local-only lockfile
 uv.lock
+
+# Local endpoint credentials
+.env
