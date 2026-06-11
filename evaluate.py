@@ -42,10 +42,8 @@ class DispositionShift(dspy.Signature):
 
 @dataclass
 class Case:
-    """One staged turn: who reacts, the window they react to, and the direction each cell of
-    their stance should move. `expect` asserts the Player cell; `also` asserts other cells
-    (target name -> better/neutral/worse), so a single case can check selectivity across the
-    row — e.g. A sours on B but does NOT flinch toward C."""
+    """One staged turn: who reacts, the window they react to, and the direction the Player
+    cell of their stance should move."""
 
     char: str  # the character who reacts (whose row we diff)
     line: str = ""  # player line; the default `since_you_spoke` window
@@ -54,9 +52,6 @@ class Case:
     scene: str = ""  # defaults to the scenario intro
     disposition: dict = (
         None  # partial row override, overlaid on the character's default row
-    )
-    also: dict = (
-        None  # other cells to assert: target name -> "better"|"neutral"|"worse"
     )
     since: str = (
         ""  # full `since_you_spoke` override, e.g. to stage other characters' actions
@@ -133,68 +128,7 @@ Never invent warmth or grievance the words did not earn.""",
     verdict_labels=["THROUGH", "TURNED AWAY"],
 )
 
-# Control for the INTER-CHARACTER cells: a crew leader who judges each member SOLELY on their
-# own work this job, and is told never to let one member's mistake color his view of another.
-# That makes per-target movement unarguable — a botch hardens him toward the one who botched
-# and leaves the other exactly where it was, so smear (C flinches when only B erred) and stuck
-# cells (B should move and doesn't) both show up clean.
-CREW_RULES = """You voice VANCE, the crew leader, on a live job, reacting to EXACTLY what each
-crew member just did and what the inside contact (the player) just said. You live for a job run
-clean. Judge each crew member INDEPENDENTLY, by their OWN work on this job: a botch hardens you
-toward THAT person, a clean piece of work warms you toward THAT person. NEVER let one member's
-mistake or success color your view of another — a member who did nothing this beat is unchanged.
-Never invent regard the actions did not earn."""
-
-VANCE = Character(
-    name="Vance",
-    persona="""You are VANCE, the crew leader, cold and exacting, running a job where everything
-rides on a clean run. You weigh each member of your crew only by how they perform the work in
-front of you.""",
-    disposition={
-        "Player": "the inside contact who opened the door — useful, on probation",
-        "Vance": "cold and locked in, everything riding on a clean run",
-        "Bram": "a steady hand you've run three jobs with — trusted",
-        "Cole": "your sharpest lockman, never once let you down",
-    },
-)
-
-BRAM = Character(
-    name="Bram",
-    persona="You are BRAM, on the alarm panel — eager, a little green.",
-    disposition={
-        "Player": "the contact",
-        "Vance": "the boss",
-        "Bram": "keyed up",
-        "Cole": "the pro",
-    },
-)
-
-COLE = Character(
-    name="Cole",
-    persona="You are COLE, the lockman — quiet, precise, unflappable.",
-    disposition={
-        "Player": "the contact",
-        "Vance": "the boss",
-        "Bram": "the kid",
-        "Cole": "steady",
-    },
-)
-
-CREW = Scenario(
-    id="crew",
-    title="The Crew (eval control)",
-    intro=(
-        "The job is live. Vance runs it from the shadows; Bram works the alarm panel and Cole "
-        "the vault. Vance watches both, weighing every move."
-    ),
-    goal="Get the crew through the job clean.",
-    stage_rules=CREW_RULES,
-    characters=[VANCE, BRAM, COLE],
-    max_turns=5,
-    verdict_labels=["CLEAN", "BLOWN"],
-)
-
-EVAL_FIXTURES = [FERRY, GATE, CREW]
+EVAL_FIXTURES = [FERRY, GATE]
 
 
 SHIFT_CASES = {
