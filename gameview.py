@@ -44,7 +44,7 @@ BG_CSS = (
     # body must go transparent too: Gradio 6 paints it opaque, and an in-flow body
     # background covers negative-z fixed elements (html keeps the canvas colour)
     "body,gradio-app,.gradio-container{background:transparent !important}"
-    ".rtr-game:has(.rtr-bg){background:rgba(255,255,255,.64);"
+    ".rtr-game:has(.rtr-bg){background:rgba(255,255,255,.78);backdrop-filter:blur(8px);"
     "padding:8px 20px 20px;border-radius:14px}"
 )
 
