@@ -8,10 +8,12 @@ dependencies = [
     "gradio==6.16.0",
     "dspy==3.2.1",
     "pydantic==2.13.4",
-    "modal==1.4.3",
 ]
 
 [dependency-groups]
 dev = [
     "pytest==8.4.1",
+]
+infra = [
+    "modal==1.4.3",
 ]
