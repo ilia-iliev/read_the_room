@@ -38,7 +38,9 @@ HIDE_CSS = ".rtr-regen-hide{display:none !important}"
 BG_CSS = (
     ".rtr-bg{position:fixed;inset:0;z-index:-1;"
     "background-size:cover;background-position:center}"
-    "gradio-app,.gradio-container{background:transparent !important}"
+    # body must go transparent too: Gradio 6 paints it opaque, and an in-flow body
+    # background covers negative-z fixed elements (html keeps the canvas colour)
+    "body,gradio-app,.gradio-container{background:transparent !important}"
     ".rtr-game:has(.rtr-bg){background:rgba(255,255,255,.64);"
     "padding:8px 20px 20px;border-radius:14px}"
 )
