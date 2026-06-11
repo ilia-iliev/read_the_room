@@ -45,21 +45,25 @@ class AuthorScenario(dspy.Signature):
 
     The game: a player talks their way through a room of `num_characters` distinct minds to
     reach a goal. Each turn the player speaks, one or two characters react in their own voice,
-    and a hidden driver advances the scene. The engine already enforces the fairness rules that
-    keep the game hard-but-winnable, so you invent ONLY the cast and the situation — never the
-    glue. The scenario MUST be winnable by a perceptive player who finds each character's lever.
+    and a hidden driver advances the scene. The engine supplies the fairness glue that keeps
+    the game hard-but-winnable; you supply the cast and the situation. Write it so a
+    perceptive player who finds each character's lever wins.
 
     Decide `cast` FIRST: exactly `num_characters` distinct names, the full roster. Then write
-    one character per name, each a sharply different person with a DIFFERENT lever — what
-    genuinely moves them, and what hardens them. Each `disposition` is an object (a row of the
-    room's relationship matrix) with one short clause per key: "Player" (their opening stance
-    toward the player), the character's OWN name (how they feel right now — their mood), and
-    EACH other character by name (what they think of them). Every disposition carries ALL
-    `num_characters` + 1 keys — every name in `cast`, the last one included; none omitted.
+    one character per name, each a sharply different person with their OWN lever — what
+    genuinely moves them, and what hardens them. Open each persona by stating plainly who this
+    character is to the player and to every other character — names, roles, and the pronouns
+    that go with them — so every relationship reads the same from every chair. Each
+    `disposition` is an object (a row of the room's relationship matrix) with one short clause
+    per key: "Player" (their opening stance toward the player), the character's OWN name (how
+    they feel right now — their mood), and EACH other character by name (what they think of
+    them). Every disposition carries ALL `num_characters` + 1 keys: "Player" plus every name
+    in `cast`, first through last.
 
-    `intro` is present tense and addresses the player directly as "you" — it sets the scene and
-    the room's challenge, the premise the player answers, no long quoted dialogue. `goal` is a
-    concrete win condition (actually achieved, not merely being tolerated or praised)."""
+    `intro` is present tense and addresses the player directly as "you": a few tight sentences
+    of pure setup that put the player in the room, name the stakes, and end where the player's
+    first words begin. `goal` is a concrete win condition the room visibly grants once the
+    player earns it."""
 
     idea: str = dspy.InputField(
         desc="the player's one- or two-line premise for the scenario"
@@ -86,7 +90,7 @@ class FillDispositions(dspy.Signature):
     character's persona and the premise. Each cell is one character's stance toward one
     party: toward "Player" (the player), toward another character by name, or toward their
     OWN name (how they feel right now — their mood). One short clause per cell; write
-    exactly the requested cells, no others."""
+    exactly the requested cells."""
 
     spec: ScenarioSpec = dspy.InputField(desc="the scenario authored so far")
     missing: list[str] = dspy.InputField(

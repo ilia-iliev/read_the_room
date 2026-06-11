@@ -14,9 +14,13 @@ class CharacterTurn(dspy.Signature):
     disposition: str = dspy.InputField(
         desc="how you CURRENTLY regard the player, yourself, and each other character — act on this"
     )
-    scene: str = dspy.InputField(desc="the objective situation in the room right now")
+    scene: str = dspy.InputField(
+        desc="the objective situation in the room right now; narration here may address "
+        "the player as 'you' — a narrated 'you' is always the player"
+    )
     since_you_spoke: str = dspy.InputField(
-        desc="what was said and done since you last spoke"
+        desc="what was said and done since you last spoke — NARRATOR lines address the "
+        "player as 'you'"
     )
     reasoning: str = dspy.OutputField(
         desc="In character, private thoughts. 1-2 punchy sentences of your thoughts on "
