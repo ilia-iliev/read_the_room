@@ -215,15 +215,13 @@ def build_creator():
     with gr.Tab("✨ Create your own"):
         gr.Markdown(
             "### Author a scenario\n"
-            "Describe a social standoff and how many people are in the room. The AI writes the "
-            "whole thing — the cast, the premise, the fairness rules that keep it winnable "
-            "— and you can edit any of it before you play. Or just fill the form by hand."
+            "Describe a social standoff. You can use AI to bootstrap the situation. "
+            "Edit (or not) and play"
         )
         with gr.Row():
             idea = gr.Textbox(
                 label="Your idea",
-                placeholder="A high-school reunion — I need my estranged best friend to "
-                "forgive me before the night is over.",
+                placeholder="Friends who can't decide what to order for dinner. Nobody's objection is about food — it's grudges, pride, and who gets to decide.",
                 lines=2,
                 scale=3,
             )
@@ -232,7 +230,7 @@ def build_creator():
                 MAX_CAST,
                 value=len(blank.characters),
                 step=1,
-                label="People in the room",
+                label="Characters",
                 scale=1,
             )
         with gr.Row():
@@ -243,9 +241,9 @@ def build_creator():
         status = gr.Markdown()
 
         title = gr.Textbox(label="Title")
-        intro = gr.Textbox(label="Intro — the scene, addressed to you", lines=3)
+        intro = gr.Textbox(label="Intro, addressed to you", lines=3)
         with gr.Row():
-            goal = gr.Textbox(label="Goal — the win condition", lines=2, scale=3)
+            goal = gr.Textbox(label="The win condition", lines=2, scale=3)
             max_turns = gr.Slider(
                 creator.MIN_TURNS,
                 12,
@@ -254,7 +252,7 @@ def build_creator():
                 label="Max turns",
                 scale=1,
             )
-        gr.Markdown("#### The cast")
+        gr.Markdown("#### Characters")
         groups, names, personas = [], [], []
         for i in range(MAX_CAST):
             live = i < len(blank.characters)
@@ -268,7 +266,7 @@ def build_creator():
                         scale=1,
                     )
                     pe = gr.Textbox(
-                        label="Persona — who they are, their voice, what they want",
+                        label="Description",
                         show_label=i == 0,
                         lines=2,
                         scale=4,
@@ -283,8 +281,7 @@ def build_creator():
         start_grid = grid_value(blank.characters)
         grid = gr.Dataframe(
             value=start_grid,
-            label="Dispositions — how each mind reads the room "
-            "(rows react to columns; their own column is their current mood)",
+            label="Intra-Character Dispositions - rows react to columns.",
             interactive=True,
             wrap=True,
             static_columns=[0],
