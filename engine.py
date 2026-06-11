@@ -8,6 +8,7 @@ reactors; only the driver writes the shared scene state.
 """
 
 import copy
+import os
 import random
 import re
 from dataclasses import dataclass, field
@@ -18,8 +19,11 @@ from pydantic import ConfigDict, Field, create_model
 
 from signatures import CharacterTurn, Finale, Referee, SituationDriver
 
-MODEL = "openai/Qwen3.6-27B"
-API_BASE = "http://localhost:8081/v1"
+# Any OpenAI-compatible server works: local vLLM/llama.cpp, or a hosted endpoint —
+# the HF Space sets these as secrets pointing at the Modal deployment. All required.
+MODEL = "openai/" + os.getenv("RTR_MODEL")
+API_BASE = os.getenv("RTR_API_BASE")
+API_KEY = os.getenv("RTR_API_KEY")
 # Qwen3.6 is a reasoning model; this toggle stops it burning the budget on hidden
 # thinking and returning empty content.
 NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
@@ -29,7 +33,7 @@ def make_lm(temperature, max_tokens=1500, cache=True):
     return dspy.LM(
         MODEL,
         api_base=API_BASE,
-        api_key="not-needed",
+        api_key=API_KEY,
         temperature=temperature,
         max_tokens=max_tokens,
         extra_body=NO_THINK,
