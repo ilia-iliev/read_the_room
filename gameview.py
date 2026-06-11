@@ -31,6 +31,9 @@ REGEN_CAP = (
 # instead — still rendered, still clickable, just not painted. Wired into the Blocks in app.py.
 HIDE_CSS = ".rtr-regen-hide{display:none !important}"
 
+# The transcript reads small against the busy scene art — bump it ~20%.
+STORY_CSS = ".rtr-story .prose{font-size:1.2em}"
+
 # The scene art is a fixed full-viewport backdrop (`.rtr-bg`, emitted by render.room_strip)
 # that hides along with its tab. The page container goes transparent so the backdrop shows
 # through, and a game that carries one gets a translucent card behind its text to stay
@@ -70,7 +73,9 @@ def build_game_ui(scen=None):
         clip = gr.Textbox(visible=False)
         # sanitize off so avatar <img> tags AND the inline ↻ links render; dynamic text is esc()'d
         story = gr.Markdown(
-            render_story(scen, g0) if scen else BLANK_STORY, sanitize_html=False
+            render_story(scen, g0) if scen else BLANK_STORY,
+            sanitize_html=False,
+            elem_classes="rtr-story",
         )
         recap = gr.HTML(visible=False)
         status = gr.Markdown(progress(scen, g0) if scen else "")

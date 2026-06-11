@@ -60,7 +60,7 @@ def load_bundle(zip_path):
 with gr.Blocks(
     title="Read the Room",
     theme=gr.themes.Soft(primary_hue="indigo"),
-    css=gameview.HIDE_CSS + gameview.BG_CSS + NAV_CSS + FOOTER_CSS,
+    css=gameview.HIDE_CSS + gameview.STORY_CSS + gameview.BG_CSS + NAV_CSS + FOOTER_CSS,
 ) as demo:
     gr.Markdown("# Read the Room", elem_classes="rtr-title")
     with gr.Tabs() as tabs:
