@@ -45,11 +45,12 @@ SCENARIO = Scenario(
     id="hero",
     title="The Warlord's Hall",
     intro=(
-        "You kneel bound at the long table of Korg the bandit-king, deep in his torchlit "
-        "hall, probably to be killed for sport. Three people rule your fate: Korg himself, drunk "
-        "and superstitious; Vesh, his sharp-eyed advisor, already hissing for your throat; and "
-        "Brull, a proud giant who lives for a challenge. You have no weapon and no friends "
-        "here — only your words. The hall falls quiet, waiting."
+        "You kneel bound at the long table of Korg the bandit-king, deep in his torchlit hall. Three "
+        "people rule your fate: Korg himself, drunk, superstitious, proud and cruel. "
+        "Vesh, his sharp-eyed right-hand advisor, already whispering in the ear of Korg, probably for your throat. "
+        "To Korg's left is Brull - a huge, muscular, ugly giant with a disfigured nose - who lives to fight. "
+        "His fists are massive and he needs no blade. You have no weapon and no friends here. "
+        "The hall falls quiet, waiting."
     ),
     goal="Walk out of the warlord's hall alive and free.",
     characters=[KORG, VESH, BRULL],

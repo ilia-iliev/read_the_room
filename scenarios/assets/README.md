@@ -1,7 +1,7 @@
 # Scenario art
 
 Art is **convention, not configuration** — there's nothing to wire up in code. Drop image
-files here and they're picked up automatically by `assets.py`.
+files here and they're picked up automatically by `art.py`.
 
 ## Layout
 
@@ -11,7 +11,7 @@ scenarios/assets/<scenario-id>/
     <character>.png    # one avatar per character, named after them (lowercased, slugged)
 ```
 
-- `<scenario-id>` is the scenario's `id` field — `hero`, `shark`, … (see each `scenarios/*.py`).
+- `<scenario-id>` is the scenario's `id` field — `hero`, `blessing`, … (see each `scenarios/*.py`).
 - `<character>` is the character's `name`, slugged: lowercased, non-alphanumerics → `-`.
   So `Korg` → `korg.png`, `Sal "the Whale"` → `sal-the-whale.png`.
 - Supported extensions, in order: `.png`, `.jpg`, `.jpeg`, `.webp`.

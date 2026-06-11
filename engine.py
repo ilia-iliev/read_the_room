@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 
 import dspy
 
+from pydantic import ConfigDict, Field, create_model
+
 from signatures import CharacterTurn, Finale, Referee, SituationDriver
 
 MODEL = "openai/Qwen3.6-27B"
@@ -92,37 +94,13 @@ class Game:
         return not self.concluded and self.turn < self.scenario.max_turns
 
 
-# The intro addresses the player as "you" so the setup card reads in second person. The model
-# channel can't use "you" — it collides with each persona's own "You are <name>". We rewrite the
-# player to singular "they": unlike "the player", it shares every verb form with "you", so the
-# swap needs no re-conjugation ("you have" -> "they have", not "the player has"). Runs ONLY when
-# seeding the engine (game.scene and log[0]), never on the card copy. Contractions and possessives
-# come first so the bare "you" rule can't pre-empt them.
-_PLAYER_POV = [
-    ("yourselves", "themselves"),
-    ("yourself", "themselves"),
-    ("you're", "they're"),
-    ("you've", "they've"),
-    ("you'll", "they'll"),
-    ("you'd", "they'd"),
-    ("yours", "theirs"),
-    ("your", "their"),
-    ("you", "they"),
-]
-
-
-def to_model_pov(text):
-    """Rewrite an intro's second-person 'you' (the player) into singular 'they' for model prompts."""
-    for word, replacement in _PLAYER_POV:
-        text = re.sub(
-            rf"\b{word}\b",
-            lambda m, r=replacement: (
-                r[0].upper() + r[1:] if m.group()[0].isupper() else r
-            ),
-            text,
-            flags=re.IGNORECASE,
-        )
-    return text
+# Beats (the intro and every driver/finale narration) address the player as "you" so the story
+# reads in second person — and that "you" crosses into the model channel VERBATIM. There used to
+# be a lexical you->they rewrite here; it could not mark case ("poke you" became "poke they")
+# and it overloaded "they" three ways (the player, the cast, anyone offstage). Instead the
+# transcript labels every beat as narration aimed at the player, and the signatures declare the
+# convention: a narrated 'you' is always the player, never the character being voiced.
+NARRATOR = "NARRATOR (to the player):"
 
 
 def norm_label(text):
@@ -136,10 +114,40 @@ def row_keys(scen):
     return ["Player", *[c.name for c in scen.characters]]
 
 
+def disposition_model(keys):
+    """The disposition row as a closed pydantic schema, fixed the moment the game starts: one
+    string slot per canonical key. The model fills slots — it cannot invent, rename, or drop
+    keys. A skipped slot defaults to '' (merge_row falls back to the prior value) rather than
+    failing the turn. Field names are positional placeholders; the alias carries the real
+    name — any spelling a creator typed, spaces and punctuation included — into the JSON
+    schema the model sees."""
+    fields = {
+        f"slot{i}": (
+            str,
+            Field(
+                "",
+                alias=key,
+                description=(
+                    "how you now regard the player"
+                    if key == "Player"
+                    else f"how you now regard {key} — or, if {key} is you, how you feel right now"
+                ),
+            ),
+        )
+        for i, key in enumerate(keys)
+    }
+    return create_model(
+        "Dispositions", __config__=ConfigDict(populate_by_name=True), **fields
+    )
+
+
 def merge_row(prior, update, keys):
-    """A refreshed row over exactly `keys`: take each cell from `update`, but fall back to the
-    prior value when the model left it blank or dropped it. Unknown keys are discarded. This is
-    the no-deletion guarantee — a party can never vanish from a character's stance."""
+    """A refreshed row over exactly `keys`: take each cell from `update` — a plain dict or the
+    filled disposition_model a turn produced — but fall back to the prior value when the model
+    left it blank or dropped it. Unknown keys are discarded. This is the no-deletion
+    guarantee — a party can never vanish from a character's stance."""
+    if hasattr(update, "model_dump"):
+        update = update.model_dump(by_alias=True)
     update = update or {}
     prior = prior or {}
     return {k: (str(update.get(k) or "").strip() or prior.get(k, "")) for k in keys}
@@ -182,14 +190,13 @@ def render_room(scen, moved, chars):
 
 
 def new_game(scen):
-    scene = to_model_pov(scen.intro)
-    log = [Event("beat", "", scene)]
+    log = [Event("beat", "", scen.intro)]
     keys = row_keys(scen)
     chars = {
         c.name: CharState(merge_row({}, c.disposition, keys), last_spoke_at=0)
         for c in scen.characters
     }
-    return Game(scenario=scen, scene=scene, chars=chars, log=log)
+    return Game(scenario=scen, scene=scen.intro, chars=chars, log=log)
 
 
 # everything a turn mutates, save the constant scenario — what a snapshot must carry to restore
@@ -217,8 +224,10 @@ def rewind_to(game, turn_no):
     return directive
 
 
-def render_window(events):
-    """Render a slice of the log as plain transcript text for a model prompt."""
+def model_transcript(events):
+    """Render a slice of the log as plain transcript text for a model prompt. Beats address the
+    player as 'you'; they cross verbatim under the NARRATOR label, which binds that 'you' to the
+    player for whichever character reads it."""
     out = []
     for e in events:
         if e.kind == "player":
@@ -226,7 +235,7 @@ def render_window(events):
         elif e.kind == "line":
             out.append(f"{e.who}: {e.text}")
         else:  # beat
-            out.append(e.text)
+            out.append(f"{NARRATOR} {e.text}")
     return "\n".join(out)
 
 
@@ -285,9 +294,18 @@ def _streamed(module, *fields):
     )
 
 
+def character_signature(scen):
+    """CharacterTurn bound to one scenario: stage rules as instructions, and the
+    updated_dispositions output retyped to the cast's closed row schema — the model fills
+    exactly the declared keys instead of reproducing names from persona prose."""
+    return CharacterTurn.with_updated_fields(
+        "updated_dispositions", type_=disposition_model(row_keys(scen))
+    ).with_instructions(scen.stage_rules)
+
+
 def _actor(scen):
     return _streamed(
-        dspy.Predict(CharacterTurn.with_instructions(scen.stage_rules)),
+        dspy.Predict(character_signature(scen)),
         "reasoning",
         "line",
     )
@@ -325,9 +343,7 @@ def _refresh_silent(game, moved, keys, label):
     referee or finale reads is stale. Reuses CharacterTurn minus its `line` output: same
     field strings, one source. Skips anyone already in `moved`; safe to call twice a turn."""
     scen = game.scenario
-    refresher = dspy.Predict(
-        CharacterTurn.delete("line").with_instructions(scen.stage_rules)
-    )
+    refresher = dspy.Predict(character_signature(scen).delete("line"))
     for char in scen.characters:
         if char.name in moved:
             continue
@@ -336,7 +352,7 @@ def _refresh_silent(game, moved, keys, label):
             persona=char.persona,
             disposition=render_row(char.name, cs.disposition, keys),
             scene=game.scene,
-            since_you_spoke=render_window(game.log[cs.last_spoke_at + 1 :]),
+            since_you_spoke=model_transcript(game.log[cs.last_spoke_at + 1 :]),
         )
         moved[char.name] = cs.disposition  # A: stance before this reflection
         cs.disposition = merge_row(cs.disposition, pred.updated_dispositions, keys)
@@ -360,7 +376,7 @@ async def play_turn_stream(game, directive):
     moved = {}  # name -> prior disposition ROW (A), for characters that spoke this turn
     for char in pick_speakers(game, directive):
         cs = game.chars[char.name]
-        window = render_window(game.log[cs.last_spoke_at + 1 :])
+        window = model_transcript(game.log[cs.last_spoke_at + 1 :])
         cur = {"name": char.name, "reasoning": "", "line": ""}
         updated = {}
         async for chunk in _actor(scen)(
@@ -392,7 +408,7 @@ async def play_turn_stream(game, directive):
         # referee rules on no stale row
         _refresh_silent(game, moved, keys, label)
 
-    this_turn = render_window(game.log[turn_start:])
+    this_turn = model_transcript(game.log[turn_start:])
     room = render_room(scen, moved, game.chars)
     prior = [e.text for e in game.log[:turn_start] if e.kind == "player"]
     player_so_far = (
@@ -431,6 +447,9 @@ async def play_turn_stream(game, directive):
             else:
                 yield {"beat": text}, False
         trace_last_call(game, f"SituationDriver  ({label})")
+        # current_scene is prompted third-person ("the player"); if next_scene's 'you' voice
+        # bleeds across output fields, the convention declared in the signatures still binds
+        # that 'you' to the player, so it seeds the next turn's prompts as-is
         game.scene = d.current_scene
         if d.next_scene.strip():
             game.log.append(Event("beat", "", d.next_scene))
@@ -447,7 +466,7 @@ async def play_turn_stream(game, directive):
             dspy.Predict(Finale.with_instructions(scen.director_rules)), "closing"
         )(
             goal=scen.goal,
-            transcript=render_window(game.log),
+            transcript=model_transcript(game.log),
             room=room,
             outcome=game.outcome,
         )

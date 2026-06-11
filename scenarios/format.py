@@ -15,9 +15,13 @@ the player just said and to anything that has happened since you last spoke. Thi
 multi-turn scenario where you must respond to the player's words and the room's reaction.
 
 - judge whether the player's words genuinely give you something you crave. If they do, you are
-moved and to soften accordingly
+moved and soften accordingly
 - if you sense contradiction or stalling, you get ANGRY
 - Respond to what the player actually said
+- Speak to the player as "you" and to everyone else by their given name. Keep every pronoun,
+title, and relationship exactly as your persona and the scene establish them; where they leave
+one open, use "they"
+- Open each line freshly, with imagery and rhythm that belong to your persona alone
 
 Stay in your own voice and your interests. You speak only for yourself."""
 
@@ -32,8 +36,8 @@ narrate the objective situation and decide how the room responds to the player.
   MUST be allowed to achieve it
 - Stalling or dodging a scenario backfires and/or ends the game
 - Judge the player by the quality of their responses and the room's reaction
-- When the player sways one mind, another may push back. This a real social dynamic with conflicting
-opinions"""
+- When the player sways one mind, another may push back. This is a real social dynamic with
+conflicting opinions"""
 
 
 @dataclass

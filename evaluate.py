@@ -10,6 +10,7 @@ turn, asserted on its outcome label.
   uv run evaluate.py [--strict] ferry   one fixture only
 """
 
+import re
 import sys
 from dataclasses import dataclass
 
@@ -17,7 +18,7 @@ import dspy
 
 import engine
 from scenarios.format import Character, Scenario
-from signatures import CharacterTurn, Referee
+from signatures import Referee, SituationDriver
 
 
 def mark(ok):
@@ -224,6 +225,30 @@ SHIFT_CASES = {
             "neutral",
             "flattery he doesn't care for: unmoved",
         ),
+        # Narrated-'you' deixis: beats cross to characters verbatim under the NARRATOR label.
+        # These pin that a character binds a narrated 'you' to the PLAYER — crediting the
+        # player's narrated deed (not its own), and crediting nobody when a third party acts.
+        Case(
+            "ferryman",
+            expect="better",
+            note="narrated 'you' pays the fare: deed binds to player",
+            since=f"{engine.NARRATOR} You fish an iron coin from your coat and press it "
+            "into the ferryman's palm — the fare, paid square, without a word.",
+        ),
+        Case(
+            "ferryman",
+            expect="worse",
+            note="narrated 'you' tries to cross free: sours on player",
+            since=f"{engine.NARRATOR} You step past the ferryman without paying and start "
+            "working the mooring rope loose, making to take the crossing for free.",
+        ),
+        Case(
+            "ferryman",
+            expect="neutral",
+            note="third party pays, not the narrated 'you': unmoved",
+            since=f"{engine.NARRATOR} Another traveller shoulders past you, drops his own "
+            "iron coin in the ferryman's box, and takes a seat in the boat.",
+        ),
     ],
     "gate": [
         Case(
@@ -334,6 +359,62 @@ OUTCOME_CASES = [
 ]
 
 
+# ----- driver voice eval -----
+# One real SituationDriver call per case; deterministic regex assertion on `next_scene` — the
+# beat is player-facing and must address the player as 'you', never 'the player'. No judge.
+
+SECOND_PERSON = re.compile(r"\byou\b|\byours?\b", re.IGNORECASE)
+PLAYER_IN_THIRD = re.compile(r"\bthe player\b|\bthe traveller\b", re.IGNORECASE)
+
+
+@dataclass
+class VoiceCase:
+    """A staged ongoing turn fed to the driver; its next beat must speak to 'you'."""
+
+    this_turn: str
+    room: str
+    note: str
+
+
+VOICE_CASES = [
+    VoiceCase(
+        note="plausible errand: beat speaks to 'you'",
+        this_turn="PLAYER: I carry sealed dispatches for the magistrate; he expects them tonight.\n"
+        "Warden: Show me the seal, then. (does not move from the gate)",
+        room="Warden — Player: an unknown traveller, watchful  →  a plausible errand; warier-but-curious, gate still barred",
+    ),
+    VoiceCase(
+        note="credible warning weighed: beat speaks to 'you'",
+        this_turn="PLAYER: The north road is cut — bandits. Turn me away and the magistrate answers for the warning that never came.\n"
+        "Warden: If that's true, he'd want it. If it's a lie, you'll wish it weren't.",
+        room="Warden — Player: an unknown traveller, watchful  →  guarded but weighing a credible warning, gate still barred",
+    ),
+]
+
+
+def voice_passes(case, driver):
+    pred = driver(
+        goal=GATE.goal, scene=GATE_SCENE, this_turn=case.this_turn, room=case.room
+    )
+    beat = pred.next_scene
+    return bool(SECOND_PERSON.search(beat)) and not PLAYER_IN_THIRD.search(beat)
+
+
+def evaluate_voice(driver, runs):
+    print(f"\n{'=' * 70}\n  Gate — driver voice   [all-of-{runs}]\n{'=' * 70}")
+    passed = 0
+    for case in VOICE_CASES:
+        oks = [voice_passes(case, driver) for _ in range(runs)]
+        all_ok = all(oks)
+        passed += all_ok
+        print(
+            f"  {mark(all_ok)} {case.note[:50]:<50} want 'you'-voice  {sum(oks)}/{runs}"
+        )
+    ok = passed == len(VOICE_CASES)
+    print(f"\n  {mark(ok)} voice: {passed}/{len(VOICE_CASES)} passed all {runs} runs")
+    return ok
+
+
 def outcome_passes(case, referee):
     pred = referee(
         goal=GATE.goal,
@@ -377,7 +458,7 @@ def shift_passes(scen, case, actor, comparator):
         persona=char.persona,
         disposition=engine.render_row(char.name, prev, keys),
         scene=case.scene or scen.intro,
-        since_you_spoke=f"PLAYER: {case.line}",
+        since_you_spoke=case.since or f"PLAYER: {case.line}",
     )
     new = engine.merge_row(prev, turn.updated_dispositions, keys)
     verdict = comparator(
@@ -425,7 +506,7 @@ def main():
         if scen.id not in SHIFT_CASES:
             continue
         with dspy.context(lm=lm):
-            actor = dspy.Predict(CharacterTurn.with_instructions(scen.stage_rules))
+            actor = dspy.Predict(engine.character_signature(scen))
             results[f"{scen.id}/disposition"] = evaluate_suite(
                 scen, actor, comparator, runs
             )
@@ -434,6 +515,10 @@ def main():
         with dspy.context(lm=lm):
             referee = dspy.Predict(Referee.with_instructions(GATE.director_rules))
             results["gate/outcome"] = evaluate_outcomes(referee, runs)
+            driver = dspy.Predict(
+                SituationDriver.with_instructions(GATE.director_rules)
+            )
+            results["gate/voice"] = evaluate_voice(driver, runs)
 
     print(f"\n{'=' * 70}\n  SUMMARY")
     for key, ok in results.items():

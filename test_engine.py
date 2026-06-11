@@ -1,7 +1,7 @@
 """Deterministic unit tests for the engine's non-LLM decision points.
 
 These touch no model: they pin the pure plumbing the LLM tests sit on top of —
-the player-POV rewrite, the transcript renderer, and the turn-taking picker.
+the transcript renderer, the turn-taking picker, and the disposition row schema.
 Each test fixes one input and asserts the one thing that must happen, every time.
 
   uv run pytest test_engine.py
@@ -9,12 +9,15 @@ Each test fixes one input and asserts the one thing that must happen, every time
 
 import engine
 from engine import (
+    NARRATOR,
     Event,
+    character_signature,
+    disposition_model,
+    merge_row,
     new_game,
     pick_speakers,
-    render_window,
+    model_transcript,
     rewind_to,
-    to_model_pov,
 )
 from scenarios.format import Character, Scenario
 
@@ -35,60 +38,49 @@ def make_char(name):
     return Character(name=name, persona="", disposition={})
 
 
-# ----- to_model_pov: second-person 'you' (the player) -> third person -----
-
-
-def test_bare_you_becomes_they():
-    assert to_model_pov("Will you let me go?") == "Will they let me go?"
-
-
-def test_leading_capital_is_preserved():
-    assert to_model_pov("You are doomed.") == "They are doomed."
-
-
-def test_verb_agreement_holds_without_conjugation():
-    # the whole point of 'they': second-person verbs stay correct, no re-conjugation
-    assert to_model_pov("You have no weapon.") == "They have no weapon."
-
-
-def test_contraction_beats_bare_you():
-    # 'you're' must be rewritten as a unit, not as 'you' + 're'
-    assert to_model_pov("You're brave.") == "They're brave."
-    assert to_model_pov("You've earned this.") == "They've earned this."
-
-
-def test_possessive_your_is_not_swallowed_by_bare_you():
-    assert to_model_pov("Drop your sword.") == "Drop their sword."
-    assert to_model_pov("The choice is yours.") == "The choice is theirs."
-
-
-def test_reflexive_yourself():
-    assert to_model_pov("Defend yourself.") == "Defend themselves."
-
-
-def test_word_boundary_leaves_lookalikes_alone():
-    # 'you' is a substring of 'young' but not a whole word there
-    assert to_model_pov("The young warrior waits.") == "The young warrior waits."
-
-
-# ----- render_window: log events -> transcript text -----
+# ----- model_transcript: log events -> transcript text -----
 
 
 def test_player_event_is_labelled():
-    assert render_window([Event("player", "", "hello")]) == "PLAYER: hello"
+    assert model_transcript([Event("player", "", "hello")]) == "PLAYER: hello"
 
 
 def test_line_event_uses_speaker_name():
     assert (
-        render_window([Event("line", "Warden", "Gate's closed.")])
+        model_transcript([Event("line", "Warden", "Gate's closed.")])
         == "Warden: Gate's closed."
     )
 
 
-def test_beat_event_is_bare_text():
+def test_beat_crosses_as_labelled_narration():
     assert (
-        render_window([Event("beat", "", "The hall falls silent.")])
-        == "The hall falls silent."
+        model_transcript([Event("beat", "", "The hall falls silent.")])
+        == f"{NARRATOR} The hall falls silent."
+    )
+
+
+def test_beat_you_crosses_verbatim():
+    # beats keep their second-person 'you' — no rewrite, so no case errors ("poke they")
+    # and no three-way 'they' collisions. The NARRATOR label plus the signature note
+    # ("a narrated 'you' is always the player") carries who it refers to.
+    assert (
+        model_transcript(
+            [Event("beat", "", "All eyes turn as you rise from your chair.")]
+        )
+        == f"{NARRATOR} All eyes turn as you rise from your chair."
+    )
+
+
+def test_dialogue_is_never_labelled_as_narration():
+    # a character's (or the player's) spoken 'you' is real dialogue: no NARRATOR label,
+    # text untouched
+    events = [
+        Event("player", "", "Do you trust me?"),
+        Event("line", "Warden", "I don't trust you."),
+    ]
+    assert (
+        model_transcript(events)
+        == "PLAYER: Do you trust me?\nWarden: I don't trust you."
     )
 
 
@@ -98,7 +90,77 @@ def test_events_join_with_newlines_in_order():
         Event("player", "", "Let me pass."),
         Event("line", "Warden", "No."),
     ]
-    assert render_window(events) == "The gate looms.\nPLAYER: Let me pass.\nWarden: No."
+    assert (
+        model_transcript(events)
+        == f"{NARRATOR} The gate looms.\nPLAYER: Let me pass.\nWarden: No."
+    )
+
+
+# ----- disposition row: keys are fixed at game start, the model only fills slots -----
+
+
+def test_schema_lists_exactly_the_canonical_keys():
+    # the row's keys are known the moment the game starts; the schema the model sees
+    # declares them outright, so it fills slots instead of guessing names from persona prose
+    M = disposition_model(["Player", "Gregor", "Marisol"])
+    assert list(M.model_json_schema()["properties"]) == ["Player", "Gregor", "Marisol"]
+
+
+def test_any_character_name_is_a_valid_key():
+    # creator-made casts carry spaces and punctuation in names — the schema holds them verbatim
+    M = disposition_model(["Player", "Mr. O'Brien"])
+    row = M.model_validate({"Mr. O'Brien": "suspicious"}).model_dump(by_alias=True)
+    assert row["Mr. O'Brien"] == "suspicious"
+
+
+def test_skipped_slot_defaults_to_blank():
+    # a dropped key must parse, not fail the turn — merge_row turns the blank into a fallback
+    M = disposition_model(["Player", "Gregor"])
+    assert M.model_validate({}).model_dump(by_alias=True) == {
+        "Player": "",
+        "Gregor": "",
+    }
+
+
+def test_misnamed_key_is_ignored_not_fatal():
+    # the frozen-self bug: the model wrote "Gregor Vega" for the "Gregor" slot all game.
+    # A stray key now falls outside the schema entirely — ignored, never matched, no crash
+    M = disposition_model(["Player", "Gregor"])
+    row = M.model_validate({"Gregor Vega": "x", "Gregor": "y"}).model_dump(
+        by_alias=True
+    )
+    assert row == {"Player": "", "Gregor": "y"}
+
+
+def test_merge_row_accepts_the_filled_model():
+    # merge_row is the single row boundary: it takes the pydantic row a turn produced
+    # and falls back to prior on every slot the model skipped
+    M = disposition_model(["Player", "Gregor"])
+    update = M.model_validate({"Player": "warming up"})
+    merged = merge_row(
+        {"Player": "cold", "Gregor": "wary"}, update, ["Player", "Gregor"]
+    )
+    assert merged == {"Player": "warming up", "Gregor": "wary"}
+
+
+def test_character_signature_pins_the_row_to_the_cast():
+    scen = make_scen(make_char("Warden"), make_char("Scribe"))
+    ann = character_signature(scen).output_fields["updated_dispositions"].annotation
+    assert list(ann.model_json_schema()["properties"]) == ["Player", "Warden", "Scribe"]
+
+
+def test_character_signature_carries_the_stage_rules():
+    scen = make_scen(make_char("Warden"))
+    assert character_signature(scen).instructions == scen.stage_rules
+
+
+def test_pinned_row_survives_dropping_the_line_field():
+    # _refresh_silent reuses the signature minus `line`; the row schema must survive that
+    scen = make_scen(make_char("Warden"))
+    sig = character_signature(scen).delete("line")
+    assert "line" not in sig.output_fields
+    ann = sig.output_fields["updated_dispositions"].annotation
+    assert list(ann.model_json_schema()["properties"]) == ["Player", "Warden"]
 
 
 # ----- pick_speakers: who reacts this turn -----

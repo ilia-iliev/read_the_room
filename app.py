@@ -7,6 +7,8 @@ which hands a freshly parsed Scenario to the dedicated Play tab.
 
 import gradio as gr
 
+import bundle
+import creator
 import creatorview
 import gameview
 from scenarios import REGISTRY
@@ -46,6 +48,16 @@ def do_load(scen):
     return (gr.update(selected=PLAY_TAB_ID), *gameview.load_into_play(scen))
 
 
+def load_bundle(zip_path):
+    """Open a saved bundle straight in the Play tab — no detour through the editor."""
+    try:
+        spec_text, art = bundle.unpack(zip_path)
+        scen = creator.spec_to_scenario(creator.from_json(spec_text), art)
+    except Exception as e:  # not a bundle / spec inside is invalid — surface as a toast
+        raise gr.Error(f"Couldn't load that bundle: {e}")
+    return gameview.load_into_play(scen)
+
+
 with gr.Blocks(
     title="Read the Room",
     theme=gr.themes.Soft(primary_hue="indigo"),
@@ -57,12 +69,22 @@ with gr.Blocks(
             gameview.build_game(scen)
         play_btn, form, art = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
+            with gr.Row():
+                load_play = gr.UploadButton(
+                    "⬆️ Load bundle (.zip)",
+                    file_types=[".zip"],
+                    type="filepath",
+                    size="sm",
+                    scale=0,
+                )
+                gr.HTML("")  # spacer keeps the button compact, left-aligned
             _scen_state, play_outs = gameview.build_game_ui()
 
     parse_state = gr.State()
     play_btn.click(creatorview.parse_or_raise, [*form, art], parse_state).success(
         do_load, parse_state, [tabs, *play_outs]
     )
+    load_play.upload(load_bundle, load_play, play_outs)
 
 if __name__ == "__main__":
     demo.launch(

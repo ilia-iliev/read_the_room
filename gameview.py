@@ -80,7 +80,7 @@ def build_game_ui(scen=None):
             act = gr.Button(
                 f"{PLAYER_VERB} ▶", variant="primary", interactive=bool(scen)
             )
-            reset = gr.Button("New game 🔁")
+            reset = gr.Button("New game")
 
         # hidden plumbing for the inline ↻ links: one button per turn index, each wired below to
         # rewind to ITS turn. The link clicks the matching `.rtr-regen-N`; nothing is passed
