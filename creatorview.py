@@ -8,6 +8,7 @@ here; Save still serializes the spec.
 import gradio as gr
 import pandas as pd
 
+import community
 import creator
 from dispositions import party_keys
 
@@ -204,14 +205,27 @@ def remove_handler(cast_now, grid):
     )
 
 
-def parse_or_raise(*args):
+def parse_or_raise(picture, *args):
     """Build the Scenario the player is about to play from the form, or raise a toast they
     can read. The .success() chain only fires on a clean parse, so the Play tab is never
-    half-filled."""
+    half-filled. The picture rides along as the backdrop; it is never serialized."""
     try:
-        return creator.spec_to_scenario(assemble(*args))
+        scen = creator.spec_to_scenario(assemble(*args))
     except Exception as e:  # invalid / incomplete spec — surface the reason as a toast
         raise gr.Error(f"Couldn't load this spec: {e}")
+    scen.scene = picture or ""
+    return scen
+
+
+def share_handler(picture, *args):
+    """Publish the form (+ optional picture) to the community dataset."""
+    spec = assemble(*args)
+    try:
+        creator.spec_to_scenario(spec)  # publish only what actually plays
+        community.publish(spec, picture)
+    except Exception as e:  # invalid spec / missing config / failed upload
+        raise gr.Error(f"Couldn't share: {e}")
+    gr.Info("Shared 🌍 — find it in the Community tab")
 
 
 def save_handler(*args):
@@ -316,6 +330,13 @@ def build_creator():
                 column_widths=grid_widths(len(start_grid.columns)),
             )
 
+        picture = gr.Image(
+            label="Scene picture (optional — the in-game backdrop, and your community card)",
+            type="filepath",
+            sources=["upload"],
+            height=160,
+        )
+
         cast = gr.State([c.name for c in blank.characters])
         with gr.Row():
             play_btn = gr.Button("Play it ▶", variant="primary", scale=3)
@@ -323,6 +344,7 @@ def build_creator():
                 "⬇️ Save scenario (.txt)", size="sm", scale=0
             )
             load_btn = load_button()
+            share_btn = gr.Button("🌍 Share to community", size="sm", scale=0)
 
         form_inputs = [title, intro, goal, max_turns, win, lose, grid, cast]
         form_inputs += [*names, *personas]
@@ -338,6 +360,8 @@ def build_creator():
             load_btn,
             play_btn,
             download_btn,
+            share_btn,
+            picture,
             add_btn,
             remove_btn,
             *form_inputs[:7],
@@ -359,5 +383,7 @@ def build_creator():
         add_btn.click(add_handler, [cast, grid], card_outputs)
         remove_btn.click(remove_handler, [cast, grid], card_outputs)
         download_btn.click(save_handler, form_inputs, download_btn)
+        share_btn.click(share_handler, [picture, *form_inputs], None)
 
-    return play_btn, form_inputs
+    # the picture leads so parse_or_raise can pull it off before assemble reads the rest
+    return play_btn, [picture, *form_inputs]

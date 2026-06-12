@@ -64,6 +64,10 @@ class Scenario:
     max_turns: int  # hard cap; the scene can end sooner
     verdict_labels: list  # [win, lose]
 
+    # local path to a scene picture travelling WITH the scenario (community entries, a
+    # creator upload); empty falls back to the assets-by-convention lookup in art.py.
+    scene: str = ""
+
     # injected as instructions for every character. Defaults to the shared spine; a scenario
     # only sets this to deliberately narrow the rules (the eval control).
     stage_rules: str = STAGE_RULES

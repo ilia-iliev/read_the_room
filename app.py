@@ -1,8 +1,9 @@
 """Read the Room — navigate a complex social situation, directed by AI.
 
 Each scenario is a tab. `gameview` builds every game from the Scenario data, so adding a
-scenario in scenarios/ adds a tab here for free; `creatorview` is the author-your-own tab,
-which hands a freshly parsed Scenario to the dedicated Play tab.
+scenario in scenarios/ adds a tab here for free; `communityview` browses what other players
+shared; `creatorview` is the author-your-own tab. Both hand a freshly parsed Scenario to
+the dedicated Play tab.
 """
 
 import threading
@@ -10,6 +11,7 @@ import urllib.request
 
 import gradio as gr
 
+import communityview
 import creator
 import creatorview
 import gameview
@@ -99,6 +101,7 @@ with gr.Blocks(
     with gr.Tabs() as tabs:
         for scen in REGISTRY.values():
             gameview.build_game(scen)
+        comm_play, comm_inputs = communityview.build_community()
         play_btn, form = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
             with gr.Row():
@@ -108,6 +111,9 @@ with gr.Blocks(
 
     parse_state = gr.State()
     play_btn.click(creatorview.parse_or_raise, form, parse_state).success(
+        do_load, parse_state, [tabs, *play_outs]
+    )
+    comm_play.click(communityview.play_or_raise, comm_inputs, parse_state).success(
         do_load, parse_state, [tabs, *play_outs]
     )
     load_play.upload(load_scenario, load_play, play_outs)
