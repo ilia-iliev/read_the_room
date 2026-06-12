@@ -53,6 +53,21 @@ SECOND_PERSON = re.compile(r"\byou\b|\byours?\b", re.IGNORECASE)
 PLAYER_IN_THIRD = re.compile(r"\bthe player\b|\bthe traveller\b", re.IGNORECASE)
 
 
+def run_suite(title, label, cases, passes, describe, runs):
+    """The all-of-N harness every suite shares: run each case `runs` times, demand every
+    run pass, print one line per case and a section summary, return the section verdict."""
+    print(f"\n{'=' * 70}\n  {title}   [all-of-{runs}]\n{'=' * 70}")
+    passed = 0
+    for case in cases:
+        oks = [passes(case) for _ in range(runs)]
+        all_ok = all(oks)
+        passed += all_ok
+        print(f"  {mark(all_ok)} {describe(case)} {sum(oks)}/{runs}")
+    ok = passed == len(cases)
+    print(f"\n  {mark(ok)} {label}: {passed}/{len(cases)} passed all {runs} runs")
+    return ok
+
+
 def voice_passes(case, driver):
     pred = driver(
         goal=GATE.goal, scene=GATE_SCENE, this_turn=case.this_turn, room=case.room
@@ -62,18 +77,14 @@ def voice_passes(case, driver):
 
 
 def evaluate_voice(driver, runs):
-    print(f"\n{'=' * 70}\n  Gate — driver voice   [all-of-{runs}]\n{'=' * 70}")
-    passed = 0
-    for case in VOICE_CASES:
-        oks = [voice_passes(case, driver) for _ in range(runs)]
-        all_ok = all(oks)
-        passed += all_ok
-        print(
-            f"  {mark(all_ok)} {case.note[:50]:<50} want 'you'-voice  {sum(oks)}/{runs}"
-        )
-    ok = passed == len(VOICE_CASES)
-    print(f"\n  {mark(ok)} voice: {passed}/{len(VOICE_CASES)} passed all {runs} runs")
-    return ok
+    return run_suite(
+        "Gate — driver voice",
+        "voice",
+        VOICE_CASES,
+        lambda case: voice_passes(case, driver),
+        lambda case: f"{case.note[:50]:<50} want 'you'-voice ",
+        runs,
+    )
 
 
 def outcome_passes(case, referee):
@@ -89,21 +100,14 @@ def outcome_passes(case, referee):
 
 
 def evaluate_outcomes(referee, runs):
-    print(f"\n{'=' * 70}\n  Gate — referee outcome   [all-of-{runs}]\n{'=' * 70}")
-    passed = 0
-    for case in OUTCOME_CASES:
-        oks = [outcome_passes(case, referee) for _ in range(runs)]
-        all_ok = all(oks)
-        passed += all_ok
-        want = "/".join(sorted(case.expect))
-        print(
-            f"  {mark(all_ok)} {case.note[:50]:<50} want {want:<14} {sum(oks)}/{runs}"
-        )
-    ok = passed == len(OUTCOME_CASES)
-    print(
-        f"\n  {mark(ok)} outcome: {passed}/{len(OUTCOME_CASES)} passed all {runs} runs"
+    return run_suite(
+        "Gate — referee outcome",
+        "outcome",
+        OUTCOME_CASES,
+        lambda case: outcome_passes(case, referee),
+        lambda case: f"{case.note[:50]:<50} want {'/'.join(sorted(case.expect)):<14}",
+        runs,
     )
-    return ok
 
 
 def shift_passes(scen, case, actor, comparator):
@@ -126,22 +130,16 @@ def shift_passes(scen, case, actor, comparator):
 
 
 def evaluate_suite(scen, actor, comparator, runs):
-    print(
-        f"\n{'=' * 70}\n  {scen.title} — disposition  (id: {scen.id})   [all-of-{runs}]\n{'=' * 70}"
+    return run_suite(
+        f"{scen.title} — disposition  (id: {scen.id})",
+        "disposition",
+        SHIFT_CASES.get(scen.id, []),
+        lambda case: shift_passes(scen, case, actor, comparator),
+        lambda case: (
+            f"[{case.char:<8}] {(case.note or case.line)[:42]:<42} want {case.expect:<8}"
+        ),
+        runs,
     )
-    items = SHIFT_CASES.get(scen.id, [])
-    passed = 0
-    for case in items:
-        oks = [shift_passes(scen, case, actor, comparator) for _ in range(runs)]
-        all_ok = all(oks)
-        passed += all_ok
-        note = case.note or case.line
-        print(
-            f"  {mark(all_ok)} [{case.char:<8}] {note[:42]:<42} want {case.expect:<8} {sum(oks)}/{runs}"
-        )
-    ok = passed == len(items)
-    print(f"\n  {mark(ok)} disposition: {passed}/{len(items)} passed all {runs} runs")
-    return ok
 
 
 def main():

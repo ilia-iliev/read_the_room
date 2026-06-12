@@ -15,6 +15,18 @@ MAX_CAST = 6  # the editor pre-builds this many character cards and shows the li
 WHO = "Who"  # the grid's display-only first column; cells are read by position, not header
 
 
+def load_button():
+    """The '⬆️ Load scenario (.txt)' control — the editor and the Play tab present the
+    same loader."""
+    return gr.UploadButton(
+        "⬆️ Load scenario (.txt)",
+        file_types=[".txt"],
+        type="filepath",
+        size="sm",
+        scale=0,
+    )
+
+
 def grid_value(characters):
     """The disposition matrix as a grid: one row per character (first cell their name), then
     one cell per party — Player plus every name; a character's own column is their mood."""
@@ -138,7 +150,7 @@ def load_handler(path):
     except (
         Exception
     ) as e:  # not a spec / invalid spec — surface it, keep the editor as-is
-        return abort(f"❌ Couldn't load that scenario: {e}")
+        return abort(f"❌ {creator.LOAD_ERROR}: {e}")
     if len(spec.characters) > MAX_CAST:
         return abort(f"❌ This editor holds up to {MAX_CAST} characters.")
     return filled(spec)
@@ -310,13 +322,7 @@ def build_creator():
             download_btn = gr.DownloadButton(
                 "⬇️ Save scenario (.txt)", size="sm", scale=0
             )
-            load_btn = gr.UploadButton(
-                "⬆️ Load scenario (.txt)",
-                file_types=[".txt"],
-                type="filepath",
-                size="sm",
-                scale=0,
-            )
+            load_btn = load_button()
 
         form_inputs = [title, intro, goal, max_turns, win, lose, grid, cast]
         form_inputs += [*names, *personas]
@@ -338,11 +344,13 @@ def build_creator():
             *names,
             *personas,
         ]
-        author_btn.click(
-            lambda: [gr.update(interactive=False)] * len(lockable), None, lockable
-        ).then(author_handler, [idea, n], outputs).then(
-            lambda: [gr.update(interactive=True)] * len(lockable), None, lockable
-        )
+
+        def locked(interactive):
+            return lambda: [gr.update(interactive=interactive)] * len(lockable)
+
+        author_btn.click(locked(False), None, lockable).then(
+            author_handler, [idea, n], outputs
+        ).then(locked(True), None, lockable)
         load_btn.upload(load_handler, [load_btn], outputs)
         # .input (not .change) so programmatic fills don't echo back through the handler
         for nm in names:

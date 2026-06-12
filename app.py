@@ -76,7 +76,7 @@ def load_scenario(path):
     try:
         scen = creator.spec_to_scenario(creator.load_spec(path))
     except Exception as e:  # not a spec / invalid spec — surface as a toast
-        raise gr.Error(f"Couldn't load that scenario: {e}")
+        raise gr.Error(f"{creator.LOAD_ERROR}: {e}")
     return gameview.load_into_play(scen)
 
 
@@ -102,13 +102,7 @@ with gr.Blocks(
         play_btn, form = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
             with gr.Row():
-                load_play = gr.UploadButton(
-                    "⬆️ Load scenario (.txt)",
-                    file_types=[".txt"],
-                    type="filepath",
-                    size="sm",
-                    scale=0,
-                )
+                load_play = creatorview.load_button()
                 gr.HTML("")  # spacer keeps the button compact, left-aligned
             _scen_state, play_outs = gameview.build_game_ui()
 

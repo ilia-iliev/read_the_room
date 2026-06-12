@@ -151,24 +151,20 @@ def author(idea, num_characters):
         return repair_dispositions(spec)
 
 
-def to_json(spec):
-    return spec.model_dump_json(indent=2)
-
-
-def from_json(text):
-    return ScenarioSpec.model_validate_json(text)
+# the one wording every loader shows when load_spec raises
+LOAD_ERROR = "Couldn't load that scenario"
 
 
 def load_spec(path):
     """A saved scenario file back as a spec — the one parse boundary every loader shares.
     Raises on anything that doesn't hold a valid spec."""
-    return from_json(Path(path).read_text(encoding="utf-8"))
+    return ScenarioSpec.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 
 def save_spec(spec):
     """The spec serialized to a shareable .txt (the spec JSON); returns the file's path."""
     out = Path(tempfile.mkdtemp()) / "scenario.txt"
-    out.write_text(to_json(spec), encoding="utf-8")
+    out.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     return str(out)
 
 

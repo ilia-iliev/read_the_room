@@ -36,8 +36,7 @@ PALETTE = [
 
 
 def slug(name):
-    """A character's name as a filesystem-safe stem: 'Sal "the Whale"' -> 'sal-the-whale'.
-    Shared with the bundle/creator so inline art keys match the on-disk convention."""
+    """A character's name as a filesystem-safe stem: 'Sal "the Whale"' -> 'sal-the-whale'."""
     return re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
 
 
