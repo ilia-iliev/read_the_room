@@ -43,3 +43,4 @@ More details in my [blogpost](https://ilia.foo/blog/read_the_room)
 
 [Video](https://www.youtube.com/watch?v=eY81SvsOJy4)
 
+[Social Media post](https://www.linkedin.com/posts/ilia-iliev-7903a015a_read-the-room-a-hugging-face-space-by-build-small-hackathon-activity-7471300743883522048-rKGz?utm_source=share&utm_medium=member_desktop&rcm=ACoAACYk8lwBA6YMOvmo6sowMJ679w1Iy48UvP0)
