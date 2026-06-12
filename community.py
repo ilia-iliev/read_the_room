@@ -56,8 +56,15 @@ def group_files(files):
 
 
 def _fetch(path):
-    """One repo file as a local path (hub-cached, so refreshes only re-download changes)."""
-    return hf_hub_download(_repo(), path, repo_type="dataset")
+    """One repo file as a local path (hub-cached, so refreshes only re-download changes).
+    Gradio only serves files from the app dir or the system temp dir — the hub cache is
+    neither, so each file is copied into temp once (entry folders are immutable)."""
+    cached = hf_hub_download(_repo(), path, repo_type="dataset")
+    dest = Path(tempfile.gettempdir()) / "rtr-community" / path
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(cached, dest)
+    return str(dest)
 
 
 def entries():
