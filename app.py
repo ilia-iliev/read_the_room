@@ -32,6 +32,10 @@ def white_edge(r):
 
 
 NAV_CSS = (
+    # Alkatra's glyph box runs a few px taller than the h1 line box; Gradio puts
+    # overflow:auto on the block as an INLINE style, so without !important the title
+    # grows a tiny scrollbar instead of just painting the overhang
+    f".rtr-title{{overflow:visible !important}}"
     f".rtr-title h1{{color:#111;text-shadow:{white_edge(1)},{white_edge(2)}}}"
     ".tab-container{background:rgba(255,255,255,.72);backdrop-filter:blur(8px);"
     "border-radius:10px;padding:0 10px}"
@@ -78,7 +82,17 @@ def load_scenario(path):
 
 with gr.Blocks(
     title="Read the Room",
-    theme=gr.themes.Soft(primary_hue="indigo"),
+    # Soft's bundled "Montserrat" woff2 is really Montserrat Alternates — a display
+    # face that's rough on body text. Alkatra keeps the storybook feel but reads better.
+    theme=gr.themes.Soft(
+        primary_hue="indigo",
+        font=(
+            gr.themes.GoogleFont("Alkatra"),
+            "ui-sans-serif",
+            "system-ui",
+            "sans-serif",
+        ),
+    ),
     css=gameview.HIDE_CSS + gameview.STORY_CSS + gameview.BG_CSS + NAV_CSS + FOOTER_CSS,
 ) as demo:
     gr.Markdown("# Read the Room", elem_classes="rtr-title")

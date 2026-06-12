@@ -46,6 +46,12 @@ BG_CSS = (
     "body,gradio-app,.gradio-container{background:transparent !important}"
     ".rtr-game:has(.rtr-bg){background:rgba(255,255,255,.78);"
     "padding:8px 20px 20px;border-radius:14px}"
+    # the theme's gray body text washes out over the translucent card — go near-black.
+    # Must hit the descendants, not .prose itself: Gradio paints every child directly
+    # via `.prose *{color:var(--body-text-color)}`, which beats inheritance. Links keep
+    # their own colour (the inline ↻/✎ controls).
+    ".rtr-game:has(.rtr-bg) .prose,"
+    ".rtr-game:has(.rtr-bg) .prose :not(a){color:#111}"
 )
 
 
