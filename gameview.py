@@ -61,6 +61,9 @@ STORY_CSS = (
     "border:1px solid rgba(99,102,241,.35) !important;"
     "border-radius:12px 12px 2px 12px !important;color:#111 !important;"
     "font-size:1.1em;padding:.5em .8em}"
+    # Gradio outlines streaming components with an animated accent border; on the
+    # transparent Markdown blocks it reads as a stray blue line over the 🤔 status
+    ".rtr-game .generating{border:none !important}"
 )
 
 # The scene art is a fixed full-viewport backdrop (`.rtr-bg`, emitted by render.room_strip)

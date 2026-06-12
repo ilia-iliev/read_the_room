@@ -211,7 +211,7 @@ def _web_rows(scen, game, c):
     ]
     mood = row.get(c.name, "")
     if mood:
-        out.append(f"<b>Self:</b> <i>{esc(mood)}</i>")
+        out.append(f"<b>Self:</b> {esc(mood)}")
     return out
 
 
