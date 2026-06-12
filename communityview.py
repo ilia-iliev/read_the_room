@@ -12,7 +12,10 @@ import creator
 
 def gallery_items(entries):
     return [
-        (e.image or art.banner_image(e.spec.title), e.spec.title or "Untitled")
+        (
+            art.thumbnail(e.image) if e.image else art.banner_image(e.spec.title),
+            e.spec.title or "Untitled",
+        )
         for e in entries
     ]
 

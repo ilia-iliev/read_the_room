@@ -135,6 +135,23 @@ def font_css():
     )
 
 
+THUMB_SIZE = (
+    512  # px cap for gallery cards; the full art stays for the in-game backdrop
+)
+
+
+def thumbnail(path):
+    """A downscaled copy cached beside the original, for browsing — community pictures
+    can be huge and the gallery card doesn't need the full art."""
+    src = Path(path)
+    dest = src.with_name(f"thumb-{src.name}")
+    if not dest.exists():
+        with Image.open(src) as img:
+            img.thumbnail((THUMB_SIZE, THUMB_SIZE))
+            img.save(dest)
+    return str(dest)
+
+
 def banner_image(title):
     """A generated stand-in card for a community entry with no picture: a palette-coloured
     banner with the title's initial — the gallery caption carries the title itself."""
