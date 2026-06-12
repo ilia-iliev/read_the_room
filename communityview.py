@@ -108,6 +108,7 @@ def build_community():
         gallery = gr.Gallery(
             show_label=False,
             columns=4,
+            fit_columns=False,  # a lone card stays card-sized instead of going full-width
             allow_preview=False,
             interactive=False,
         )
