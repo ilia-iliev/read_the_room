@@ -1,6 +1,6 @@
 ---
 title: Read The Room
-emoji: 💻
+emoji: 👀
 colorFrom: yellow
 colorTo: yellow
 sdk: gradio
