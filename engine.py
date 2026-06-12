@@ -221,11 +221,14 @@ def pick_speakers(game, directive):
 
 
 def _streamed(module, *fields):
-    """A streamified Predict that surfaces the named output fields token-by-token as it writes."""
+    """A streamified Predict that surfaces the named output fields token-by-token as it writes.
+    allow_reuse, because the actor is called once per speaker in a turn: without it a listener
+    goes silent after its first stream, so only the first speaker would stream live."""
     return dspy.streamify(
         module,
         stream_listeners=[
-            dspy.streaming.StreamListener(signature_field_name=f) for f in fields
+            dspy.streaming.StreamListener(signature_field_name=f, allow_reuse=True)
+            for f in fields
         ],
     )
 
