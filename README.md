@@ -17,3 +17,7 @@ Read the Room drops you into a room full of people - each character has an agend
 ## Off the grid
 
 The app makes zero network requests of its own - art and font are bundled and inlined. Point `RTR_API_BASE` at a local llama.cpp/vLLM and it runs fully offline (the hosted Space points it at a Modal GPU instead).
+
+## Open trace
+
+Full playthrough traces - every raw prompt and completion, straight from the in-game 🐞 export - are published at [TODO: dataset link].
