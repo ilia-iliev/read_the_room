@@ -213,93 +213,110 @@ def build_creator():
     needs to wire that handoff: (play_btn, form_inputs)."""
     blank = creator.blank_spec(3)
     with gr.Tab("✨ Create your own"):
-        gr.Markdown(
-            "### Author a scenario\n"
-            "Describe a social standoff. You can use AI to bootstrap the situation. "
-            "Edit (or not) and play"
-        )
         with gr.Row():
             idea = gr.Textbox(
                 label="Your idea",
                 placeholder="Friends who can't decide what to order for dinner. Nobody's objection is about food — it's grudges, pride, and who gets to decide.",
                 lines=2,
-                scale=3,
+                scale=4,
             )
-            n = gr.Slider(
-                1,
-                MAX_CAST,
+            n = gr.Number(
                 value=len(blank.characters),
-                step=1,
+                minimum=1,
+                maximum=MAX_CAST,
+                precision=0,
                 label="Characters",
-                scale=1,
+                scale=0,
+                min_width=110,
             )
-        with gr.Row():
-            author_btn = gr.Button("Author with AI ✨", variant="primary")
-            load_btn = gr.UploadButton(
-                "⬆️ Load scenario (.txt)", file_types=[".txt"], type="filepath"
+            author_btn = gr.Button(
+                "Author with AI ✨", variant="primary", scale=0, min_width=180
             )
         status = gr.Markdown()
 
-        title = gr.Textbox(label="Title")
-        intro = gr.Textbox(label="Intro, addressed to you", lines=3)
         with gr.Row():
-            goal = gr.Textbox(label="The win condition", lines=2, scale=3)
-            max_turns = gr.Slider(
-                creator.MIN_TURNS,
-                12,
+            title = gr.Textbox(label="Title", scale=3)
+            max_turns = gr.Number(
                 value=blank.max_turns,
-                step=1,
+                minimum=creator.MIN_TURNS,
+                maximum=12,
+                precision=0,
                 label="Max turns",
-                scale=1,
+                scale=0,
+                min_width=110,
             )
-        gr.Markdown("#### Characters")
+        intro = gr.Textbox(
+            label="Intro, addressed to you",
+            placeholder="Set the scene, spoken to the player: 'You walk into…'",
+            lines=2,
+            max_lines=6,
+        )
+        with gr.Row():
+            goal = gr.Textbox(
+                label="Win condition",
+                placeholder="What you must pull off — social leverage, not trivia",
+                lines=1,
+                max_lines=3,
+                scale=3,
+            )
+            win = gr.Textbox(
+                label="Win verdict", value=creator.DEFAULT_LABELS[0], scale=1
+            )
+            lose = gr.Textbox(
+                label="Lose verdict", value=creator.DEFAULT_LABELS[1], scale=1
+            )
+
+        with gr.Row():
+            gr.Markdown("#### Characters")
+            add_btn = gr.Button("➕ Add", size="sm", scale=0)
+            remove_btn = gr.Button("➖ Remove", size="sm", scale=0)
         groups, names, personas = [], [], []
         for i in range(MAX_CAST):
             live = i < len(blank.characters)
             # table-like: the column labels show on the first card only
-            with gr.Group(visible=live) as g:
-                with gr.Row():
-                    nm = gr.Textbox(
-                        value=blank.characters[i].name if live else "",
-                        label="Name",
-                        show_label=i == 0,
-                        scale=1,
-                    )
-                    pe = gr.Textbox(
-                        label="Description",
-                        show_label=i == 0,
-                        lines=2,
-                        scale=4,
-                    )
+            with gr.Row(visible=live) as g:
+                nm = gr.Textbox(
+                    value=blank.characters[i].name if live else "",
+                    label="Name",
+                    show_label=i == 0,
+                    scale=1,
+                )
+                pe = gr.Textbox(
+                    label="Description",
+                    show_label=i == 0,
+                    lines=1,
+                    max_lines=4,
+                    scale=4,
+                )
             groups.append(g)
             names.append(nm)
             personas.append(pe)
-        with gr.Row():
-            add_btn = gr.Button("➕ Add character", size="sm")
-            remove_btn = gr.Button("➖ Remove last", size="sm")
 
         start_grid = grid_value(blank.characters)
-        grid = gr.Dataframe(
-            value=start_grid,
-            label="Intra-Character Dispositions - rows react to columns.",
-            interactive=True,
-            wrap=True,
-            static_columns=[0],
-            column_widths=grid_widths(len(start_grid.columns)),
-        )
-
-        with gr.Row():
-            win = gr.Textbox(
-                label="Verdict when you win", value=creator.DEFAULT_LABELS[0]
-            )
-            lose = gr.Textbox(
-                label="Verdict when you lose", value=creator.DEFAULT_LABELS[1]
+        with gr.Accordion(
+            "Dispositions — who starts feeling what about whom", open=False
+        ):
+            grid = gr.Dataframe(
+                value=start_grid,
+                interactive=True,
+                wrap=True,
+                static_columns=[0],
+                column_widths=grid_widths(len(start_grid.columns)),
             )
 
         cast = gr.State([c.name for c in blank.characters])
         with gr.Row():
             play_btn = gr.Button("Play it ▶", variant="primary", scale=3)
-            download_btn = gr.DownloadButton("⬇️ Save scenario (.txt)", scale=1)
+            download_btn = gr.DownloadButton(
+                "⬇️ Save scenario (.txt)", size="sm", scale=0
+            )
+            load_btn = gr.UploadButton(
+                "⬆️ Load scenario (.txt)",
+                file_types=[".txt"],
+                type="filepath",
+                size="sm",
+                scale=0,
+            )
 
         form_inputs = [title, intro, goal, max_turns, win, lose, grid, cast]
         form_inputs += [*names, *personas]
