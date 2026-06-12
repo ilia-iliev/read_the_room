@@ -14,9 +14,13 @@ pinned: false
 
 Read the Room drops you into a room full of people - each character has an agenda and opinion of each other. You talk, they react, alliances shift, and every word either opens a door or closes one. Make smart choices and read the social cues. I have defined 2 scenarios - but you can build your own with a template
 
+## Community scenarios
+
+The 🌍 Community tab is an open shelf: anyone can publish a scenario (with an optional scene picture) and play what others shared. Entries live in a public HF dataset — set `RTR_COMMUNITY_REPO` to its repo id (e.g. `<owner>/read-the-room-community`); publishing also needs an `HF_TOKEN` with write access to it. Browsing works without a token.
+
 ## Off the grid
 
-The app makes zero network requests of its own - art and font are bundled and inlined. Point `RTR_API_BASE` at a local llama.cpp/vLLM and it runs fully offline (the hosted Space points it at a Modal GPU instead).
+The app makes zero network requests of its own - art and font are bundled and inlined. Point `RTR_API_BASE` at a local llama.cpp/vLLM and it runs fully offline (the hosted Space points it at a Modal GPU instead). The one exception is the 🌍 Community tab, which talks to the HF Hub when you browse or share.
 
 ## Open trace
 

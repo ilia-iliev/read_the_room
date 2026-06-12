@@ -19,6 +19,8 @@ import mimetypes
 import re
 from pathlib import Path
 
+from PIL import Image, ImageDraw, ImageFont
+
 ASSETS = Path(__file__).parent / "scenarios" / "assets"
 FONTS = Path(__file__).parent / "fonts"
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
@@ -114,9 +116,11 @@ def avatar_uri(scen, char):
 
 
 def scene_uri(scen):
-    """The scene banner: `<scenario>/scene.<ext>` on disk, else None — no banner is
+    """The scene banner: the picture the scenario itself carries (community entries, a
+    creator upload), else `<scenario>/scene.<ext>` on disk, else None — no banner is
     shown unless a real image exists."""
-    return _file_uri(_find(scen.id, "scene"))
+    own = Path(scen.scene) if scen.scene else None
+    return _file_uri(own if own and own.is_file() else _find(scen.id, "scene"))
 
 
 def font_css():
@@ -129,3 +133,17 @@ def font_css():
         f" format('woff2');unicode-range:{urange}}}"
         for fname, urange in FONT_SUBSETS.items()
     )
+
+
+def banner_image(title):
+    """A generated stand-in card for a community entry with no picture: a palette-coloured
+    banner with the title's initial — the gallery caption carries the title itself."""
+    img = Image.new("RGB", (320, 180), _color(title or "?"))
+    ImageDraw.Draw(img).text(
+        (160, 90),
+        _initial(title),
+        fill="#f2efe9",
+        anchor="mm",
+        font=ImageFont.load_default(64),
+    )
+    return img
