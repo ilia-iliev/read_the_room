@@ -9,6 +9,7 @@ import pytest
 
 import art
 import community
+import communityview
 import creator
 from scenarios.format import Character, Scenario
 
@@ -75,3 +76,31 @@ def test_to_scenario_carries_the_entry_image():
     spec = creator.blank_spec(1)
     entry = community.Entry(folder="x", spec=spec, image="/tmp/scene.jpg")
     assert community.to_scenario(entry).scene == "/tmp/scene.jpg"
+
+
+# ----- search: narrowing the shelf -----
+
+
+def entry_with(**fields):
+    spec = creator.blank_spec(1).model_copy(update=fields)
+    return community.Entry(folder="x", spec=spec, image="")
+
+
+def test_search_matches_title_intro_goal_and_names():
+    entries = [
+        entry_with(title="The Heist"),
+        entry_with(intro="You walk into a heist gone wrong"),
+        entry_with(goal="call off the heist"),
+        entry_with(title="Dinner"),
+    ]
+    assert communityview.filter_entries(entries, "HEIST") == entries[:3]
+    named = creator.blank_spec(1)
+    named.characters[0].name = "Margot"
+    assert communityview.matches(named, "margot")
+
+
+def test_blank_query_keeps_everything():
+    entries = [entry_with(title="A"), entry_with(title="B")]
+    assert communityview.filter_entries(entries, "") == entries
+    assert communityview.filter_entries(entries, "  ") == entries
+    assert communityview.filter_entries(entries, None) == entries
