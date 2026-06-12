@@ -25,7 +25,8 @@ def esc(text):
 
 # A scenario-agnostic cue to act, shown once at the opening (intros set the scene but don't
 # all end on a hook). The player is "you" here; the model channel never sees this line.
-PROMPT_TO_SPEAK = "*The room turns to you. What do you say?*"
+# Rendered as a narration beat, so the italics come from the CSS register, not markdown.
+PROMPT_TO_SPEAK = "The room turns to you. What do you say?"
 
 
 # Inline rewind links on each of the player's past lines. Each turn index has its own hidden
@@ -80,8 +81,23 @@ def edit_link(turn_no):
     )
 
 
-def header(scen):
-    return f"{esc(scen.intro)}\n\n**Goal:** {esc(scen.goal)}"
+def _block(cls, body):
+    """One transcript entry as a classed <div> whose markdown stays live: the blank lines
+    make the tag its own HTML block, so the body still renders as markdown paragraph(s)
+    while CSS addresses each kind of entry by class (the registers in gameview.STORY_CSS)."""
+    return f'\n\n<div class="{cls}">\n\n{body}\n\n</div>'
+
+
+def header(scen, started):
+    """The setup card: the intro folded into a <details> that stands open until the player's
+    first line and collapses to one row after, with the goal pinned visible below it — the
+    goal's underline (CSS) is the boundary where the setup ends and play begins."""
+    state = "" if started else " open"
+    return (
+        f'<details class="rtr-setup"{state}><summary>📜 The scene</summary>\n\n'
+        f"{esc(scen.intro)}\n\n</details>"
+        + _block("rtr-goal", f"**Goal:** {esc(scen.goal)}")
+    )
 
 
 def speaker_tag(uri, name):
@@ -101,28 +117,29 @@ def render_story(scen, game, current=None):
     scene beat the director is writing (`{"beat": text}`). Private reasoning is never shown
     here — it lives in the debug log."""
     avatars = {c.name: avatar_uri(scen, c) for c in scen.characters}
-    md = header(scen)
-    if not any(
-        e.kind == "player" for e in game.log
-    ):  # opening: cue the player to speak
-        md += f"\n\n{PROMPT_TO_SPEAK}"
+    started = any(e.kind == "player" for e in game.log)
+    md = header(scen, started)
+    if not started:  # opening: cue the player to speak
+        md += _block("rtr-beat", PROMPT_TO_SPEAK)
     turn_no = 0  # 0-based index of each player turn, matching game.snapshots for rewind
     for e in game.log[1:]:  # log[0] is the intro; the setup card already shows it
         if e.kind == "beat":
-            md += f"\n\n---\n\n{esc(e.text)}"
+            md += _block("rtr-beat", esc(e.text))
         elif e.kind == "player":
-            md += (
-                f"\n\n**You:** *“{esc(e.text)}”*"
-                f"{regen_link(turn_no)}{edit_link(turn_no)}"
+            md += _block(
+                "rtr-you",
+                f"“{esc(e.text)}”{regen_link(turn_no)}{edit_link(turn_no)}",
             )
             turn_no += 1
         elif e.kind == "line":
-            md += f"\n\n{speaker_tag(avatars[e.who], e.who)} *{esc(e.text)}*"
+            md += _block(
+                "rtr-line", f"{speaker_tag(avatars[e.who], e.who)} {esc(e.text)}"
+            )
     if current and "name" in current:  # a character speaking live
         tag = speaker_tag(avatars[current["name"]], current["name"])
-        md += f"\n\n{tag} *{esc(current['line'])}* ▌"
+        md += _block("rtr-line", f"{tag} {esc(current['line'])} ▌")
     elif current:  # a scene beat the director is writing live
-        md += f"\n\n---\n\n{esc(current['beat'])} ▌"
+        md += _block("rtr-beat", f"{esc(current['beat'])} ▌")
     return md
 
 

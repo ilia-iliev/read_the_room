@@ -31,8 +31,24 @@ REGEN_CAP = (
 # instead — still rendered, still clickable, just not painted. Wired into the Blocks in app.py.
 HIDE_CSS = ".rtr-regen-hide{display:none !important}"
 
-# The transcript reads small against the busy scene art — bump it ~20%.
-STORY_CSS = ".rtr-story .prose{font-size:1.2em}"
+# The transcript's reading system. render.py wraps every entry in a classed <div>, and each
+# kind gets its own register here: character speech is the plain register (avatar + name),
+# narration recedes as italic stage direction, the player's lines are right-hand chat
+# bubbles, and the setup folds into a one-line <details> once play starts (the pinned goal
+# line underneath carries the border that marks where play begins).
+STORY_CSS = (
+    ".rtr-story .prose{font-size:1.2em}"  # reads small against the busy scene art
+    ".rtr-story .prose p{margin:.45em 0}"  # the theme's prose margins waste vertical space
+    ".rtr-setup summary{cursor:pointer;font-weight:600}"
+    ".rtr-goal{border-bottom:1px solid rgba(0,0,0,.15);"
+    "padding-bottom:.5em;margin-bottom:.7em}"
+    ".rtr-you{text-align:right}"
+    ".rtr-you p{display:inline-block;text-align:left;max-width:75%;"
+    "background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);"
+    "border-radius:12px 12px 2px 12px;padding:.3em .7em;margin:.4em 0}"
+    # opacity, not color, so the over-art near-black prose rule can't cancel the muting
+    ".rtr-beat{font-style:italic;font-size:.95em;opacity:.85;padding-left:1.2em}"
+)
 
 # The scene art is a fixed full-viewport backdrop (`.rtr-bg`, emitted by render.room_strip)
 # that hides along with its tab. The page container goes transparent so the backdrop shows
