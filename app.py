@@ -13,6 +13,7 @@ import gradio as gr
 import creator
 import creatorview
 import gameview
+from art import font_css
 from engine import API_BASE
 from scenarios import REGISTRY
 
@@ -83,17 +84,24 @@ def load_scenario(path):
 with gr.Blocks(
     title="Read the Room",
     # Soft's bundled "Montserrat" woff2 is really Montserrat Alternates — a display
-    # face that's rough on body text. Alkatra keeps the storybook feel but reads better.
+    # face that's rough on body text. Alkatra keeps the storybook feel but reads better;
+    # it ships in fonts/ (inlined by font_css) rather than as a GoogleFont so the app
+    # loads nothing from the network.
     theme=gr.themes.Soft(
         primary_hue="indigo",
         font=(
-            gr.themes.GoogleFont("Alkatra"),
+            "Alkatra",
             "ui-sans-serif",
             "system-ui",
             "sans-serif",
         ),
     ),
-    css=gameview.HIDE_CSS + gameview.STORY_CSS + gameview.BG_CSS + NAV_CSS + FOOTER_CSS,
+    css=font_css()
+    + gameview.HIDE_CSS
+    + gameview.STORY_CSS
+    + gameview.BG_CSS
+    + NAV_CSS
+    + FOOTER_CSS,
 ) as demo:
     gr.Markdown("# Read the Room", elem_classes="rtr-title")
     with gr.Tabs() as tabs:

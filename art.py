@@ -1,5 +1,5 @@
-"""Images for the room — all returned as inline data URIs so nothing depends on Gradio's
-file serving and the whole app stays a single drop-in.
+"""Images and the theme font for the room — all returned as inline data URIs so nothing
+depends on Gradio's file serving (or the network) and the whole app stays a single drop-in.
 
 Art is CONVENTION, not configuration. Drop files under `scenarios/assets/<scenario-id>/`:
 
@@ -20,7 +20,23 @@ import re
 from pathlib import Path
 
 ASSETS = Path(__file__).parent / "scenarios" / "assets"
+FONTS = Path(__file__).parent / "fonts"
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+# Alkatra (variable, weights 400–700) bundled per script subset, mirroring the split —
+# and unicode-range — of fonts.googleapis.com, so the page never fetches a font.
+FONT_SUBSETS = {
+    "alkatra-latin.woff2": (
+        "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,"
+        "U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,"
+        "U+FEFF,U+FFFD"
+    ),
+    "alkatra-latin-ext.woff2": (
+        "U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,"
+        "U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,"
+        "U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF"
+    ),
+}
 
 # muted, slightly grim palette — picked per character so the cast reads as distinct discs
 PALETTE = [
@@ -101,3 +117,15 @@ def scene_uri(scen):
     """The scene banner: `<scenario>/scene.<ext>` on disk, else None — no banner is
     shown unless a real image exists."""
     return _file_uri(_find(scen.id, "scene"))
+
+
+def font_css():
+    """@font-face rules with each woff2 inlined as a data URI — same drop-in policy as
+    the images: the theme font works with the network cable pulled."""
+    return "".join(
+        "@font-face{font-family:Alkatra;font-style:normal;font-weight:400 700;"
+        "font-display:swap;"
+        f"src:url({_data_uri('font/woff2', (FONTS / fname).read_bytes())})"
+        f" format('woff2');unicode-range:{urange}}}"
+        for fname, urange in FONT_SUBSETS.items()
+    )
