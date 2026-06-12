@@ -48,6 +48,19 @@ STORY_CSS = (
     "border-radius:12px 12px 2px 12px;padding:.3em .7em;margin:.4em 0}"
     # opacity, not color, so the over-art near-black prose rule can't cancel the muting
     ".rtr-beat{font-style:italic;font-size:.95em;opacity:.85;padding-left:1.2em}"
+    # the input is the player's NEXT bubble: same indigo tint, border, and signature
+    # corner as .rtr-you, just full-width. The Gradio block wrapper goes transparent
+    # so only the bubble shows; !important beats the theme's input/block fills.
+    # the gray frame is painted by Gradio's .form GROUPING wrapper, not the textbox —
+    # clear it (and every layer inside the box except the textarea) so only the bubble shows
+    ".form:has(.rtr-say),.rtr-say,.rtr-say :not(textarea){"
+    "background:transparent !important;border:none !important;box-shadow:none !important}"
+    # solid, not translucent: the scene art bleeding through made the box murky, and the
+    # input should be the brightest spot on the card — white with a breath of indigo
+    ".rtr-say textarea{background:#f7f8ff !important;"
+    "border:1px solid rgba(99,102,241,.35) !important;"
+    "border-radius:12px 12px 2px 12px !important;color:#111 !important;"
+    "font-size:1.1em;padding:.5em .8em}"
 )
 
 # The scene art is a fixed full-viewport backdrop (`.rtr-bg`, emitted by render.room_strip)
@@ -86,13 +99,6 @@ def build_game_ui(scen=None):
     # (via JS `closest('.rtr-game')`) and never another tab's, even with several games in the page
     with gr.Column(elem_classes="rtr-game"):
         banner = gr.HTML(room_strip(scen) if scen else "")
-        # utility icons, top-right: copy the readable conversation, or the raw LM traces, to
-        # the clipboard. Each handler stashes its text in a hidden box, then JS copies it.
-        with gr.Row():
-            gr.HTML("")  # spacer pushes the icons to the right
-            copy_convo = gr.Button("📋", scale=0, size="sm")
-            copy_debug = gr.Button("🐞", scale=0, size="sm")
-        clip = gr.Textbox(visible=False)
         # sanitize off so avatar <img> tags AND the inline ↻ links render; dynamic text is esc()'d
         story = gr.Markdown(
             render_story(scen, g0) if scen else BLANK_STORY,
@@ -106,12 +112,21 @@ def build_game_ui(scen=None):
             show_label=False,
             lines=2,
             autofocus=True,
+            elem_classes="rtr-say",
         )
         with gr.Row():
             act = gr.Button(
                 f"{PLAYER_VERB} ▶", variant="primary", interactive=bool(scen)
             )
             reset = gr.Button("New game")
+        # utility icons, bottom-right under the whole conversation: copy the readable
+        # conversation, or the raw LM traces, to the clipboard. Each handler stashes its
+        # text in a hidden box, then JS copies it.
+        with gr.Row():
+            gr.HTML("")  # spacer pushes the icons to the right
+            copy_convo = gr.Button("📋", scale=0, size="sm")
+            copy_debug = gr.Button("🐞", scale=0, size="sm")
+        clip = gr.Textbox(visible=False)
 
         # hidden plumbing for the inline ↻ links: one button per turn index, each wired below to
         # rewind to ITS turn. The link clicks the matching `.rtr-regen-N`; nothing is passed

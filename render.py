@@ -10,7 +10,11 @@ import gradio as gr
 from art import avatar_uri, scene_uri
 from engine import final_verdict, new_game
 
-WIN_ICON, LOSE_ICON = "🏆", "💀"
+# The end screen carries the verdict as colour, not iconography: the whole recap card
+# tints gold on a win and crimson on a loss, so how it ended is obvious even scrolled
+# past the verdict word — and no skull presumes a loss means death.
+WIN_TINT = ("#7a5800", "rgba(212,160,30,.55)", "rgba(212,160,30,.12)")
+LOSE_TINT = ("#8b1a1a", "rgba(139,26,26,.55)", "rgba(139,26,26,.10)")
 
 # the player-facing verb: the input label, the act button, and the turn status line
 PLAYER_VERB = "Say"
@@ -94,7 +98,7 @@ def header(scen, started):
     goal's underline (CSS) is the boundary where the setup ends and play begins."""
     state = "" if started else " open"
     return (
-        f'<details class="rtr-setup"{state}><summary>📜 The scene</summary>\n\n'
+        f'<details class="rtr-setup"{state}><summary>The scene</summary>\n\n'
         f"{esc(scen.intro)}\n\n</details>"
         + _block("rtr-goal", f"**Goal:** {esc(scen.goal)}")
     )
@@ -219,7 +223,7 @@ def end_screen(scen, game):
     if not game.concluded:
         return gr.update(value="", visible=False)
     verdict = final_verdict(game)
-    icon = WIN_ICON if verdict == scen.verdict_labels[0] else LOSE_ICON
+    text, border, wash = WIN_TINT if verdict == scen.verdict_labels[0] else LOSE_TINT
     cards = "".join(
         f'<div style="display:flex;gap:12px;align-items:flex-start;margin:12px 0">'
         f'<img src="{avatar_uri(scen, c)}" '
@@ -234,12 +238,13 @@ def end_screen(scen, game):
     )
     return gr.update(
         value=(
-            f'<div style="text-align:center;font-size:44px;line-height:1">{icon}</div>'
-            f'<div style="text-align:center;font-size:24px;font-weight:700;'
-            f'letter-spacing:3px;margin-top:2px">{verdict}</div>'
-            f'<hr style="margin:14px 0">'
+            f'<div style="border:2px solid {border};background:{wash};'
+            f'border-radius:12px;padding:14px 18px">'
+            f'<div style="text-align:center;font-size:28px;font-weight:700;'
+            f'letter-spacing:4px;color:{text}">{verdict}</div>'
+            f'<hr style="margin:12px 0;border:none;border-top:1px solid {border}">'
             f'<div style="font-weight:600;margin-bottom:2px">How the room ended up</div>'
-            f"{cards}"
+            f"{cards}</div>"
         ),
         visible=True,
     )
