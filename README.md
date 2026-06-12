@@ -8,6 +8,15 @@ sdk_version: 6.16.0
 python_version: "3.13"
 app_file: app.py
 pinned: false
+tags:
+  - track:wood
+  - sponsor:openai
+  - sponsor:modal
+  - achievement:offgrid
+  - achievement:offbrand
+  - achievement:llama
+  - achievement:sharing
+  - achievement:fieldnotes
 ---
 
 # Track 2: Read the Room
