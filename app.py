@@ -88,14 +88,15 @@ with gr.Blocks(
     # Soft's bundled "Montserrat" woff2 is really Montserrat Alternates — a display
     # face that's rough on body text. Alkatra keeps the storybook feel but reads better;
     # it ships in fonts/ (inlined by font_css) rather than as a GoogleFont so the app
-    # loads nothing from the network.
+    # loads nothing from the network. Each name is wrapped in Font (a bare str would
+    # crash launch(): gradio compares themes font-by-font and Font.__eq__ can't take str).
     theme=gr.themes.Soft(
         primary_hue="indigo",
         font=(
-            "Alkatra",
-            "ui-sans-serif",
-            "system-ui",
-            "sans-serif",
+            gr.themes.Font("Alkatra"),
+            gr.themes.Font("ui-sans-serif"),
+            gr.themes.Font("system-ui"),
+            gr.themes.Font("sans-serif"),
         ),
     ),
     css=font_css()
