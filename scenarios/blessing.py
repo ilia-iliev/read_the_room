@@ -70,13 +70,15 @@ SCENARIO = Scenario(
     id="blessing",
     title="The Blessing",
     intro=(
-        "The ring is in your pocket and Alex is stuck on a delayed train — so you're walking "
-        "into her family's dinner alone, tonight of all nights, to ask the Vegas for their blessing. "
-        "Gregor decided years ago that nobody would ever be good enough, and his no was loaded "
-        "before you rang the doorbell. Marisol pours the wine and asks the soft questions that "
-        "rehearsed answers can't survive — and hers is the verdict the house actually waits for. "
-        "Daniel, the younger brother, is already grinning, planning to poke you until whatever's "
-        "beneath the table manners shows itself. They all sit down leaning no. Earn the yes."
+        "The ring is in your pocket, but your bride-to-be Alex is stuck on a delayed train — "
+        "so you're walking into the Vega family dinner alone, tonight of all nights, to ask "
+        "her family for their blessing. Gregor, her father, decided years ago that nobody "
+        "would ever be good enough for his daughter, and his no was loaded before you rang "
+        "the doorbell. Marisol, her mother, pours the wine and asks the soft questions that "
+        "rehearsed answers can't survive — and hers is the verdict the house actually waits "
+        "for. Daniel, Alex's younger brother, is already grinning, planning to poke you until "
+        "whatever's beneath the table manners shows itself. They all sit down leaning no. "
+        "Earn the yes."
     ),
     goal="Win the family's blessing for your engagement to Alex.",
     characters=[GREGOR, MARISOL, DANIEL],
