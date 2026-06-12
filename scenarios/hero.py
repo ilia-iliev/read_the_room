@@ -48,7 +48,7 @@ SCENARIO = Scenario(
         "You kneel bound at the long table of Korg the bandit-king, deep in his torchlit hall. Three "
         "people rule your fate: Korg himself, drunk, superstitious, proud and cruel. "
         "Vesh, his sharp-eyed right-hand advisor, already whispering in the ear of Korg, probably for your throat. "
-        "To Korg's left is Brull - a huge, muscular, ugly giant with a disfigured nose - who lives to fight. "
+        "To Korg's left is Brull - a huge, muscular giant with a disfigured nose - who lives to fight. "
         "His fists are massive and he needs no blade. You have no weapon and no friends here. "
         "The hall falls quiet, waiting."
     ),

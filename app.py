@@ -90,6 +90,9 @@ with gr.Blocks(
     # it ships in fonts/ (inlined by font_css) rather than as a GoogleFont so the app
     # loads nothing from the network. Each name is wrapped in Font (a bare str would
     # crash launch(): gradio compares themes font-by-font and Font.__eq__ can't take str).
+    # .set() strips Soft's per-field chrome — the indigo label pills and the white card
+    # behind every component turned the creator form into a wall of boxes. Labels become
+    # plain text on the page; only the inputs themselves keep an outline.
     theme=gr.themes.Soft(
         primary_hue="indigo",
         font=(
@@ -98,11 +101,19 @@ with gr.Blocks(
             gr.themes.Font("system-ui"),
             gr.themes.Font("sans-serif"),
         ),
+    ).set(
+        block_background_fill="transparent",
+        block_shadow="none",
+        block_title_background_fill="none",
+        block_title_padding="0",
+        block_title_text_color="*neutral_500",
+        block_title_text_weight="500",
     ),
     css=font_css()
     + gameview.HIDE_CSS
     + gameview.STORY_CSS
     + gameview.BG_CSS
+    + creatorview.CREATOR_CSS
     + NAV_CSS
     + FOOTER_CSS,
 ) as demo:

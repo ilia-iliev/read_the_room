@@ -13,6 +13,18 @@ import creator
 from dispositions import party_keys
 
 MAX_CAST = 6  # the editor pre-builds this many character cards and shows the live ones
+
+# the flat theme (app.py) strips the card behind every component; these two are
+# container-style widgets whose card WAS their boundary, so they get a quiet outline back
+CREATOR_CSS = (
+    ".rtr-drop{border:1px dashed var(--border-color-primary);"
+    "border-radius:var(--block-radius)}"
+    ".rtr-fold{border:1px solid var(--border-color-primary);"
+    "border-radius:var(--block-radius)}"
+    # match the flat field labels: same size/colour as block titles, snugged to its zone
+    ".rtr-caption p{color:var(--block-title-text-color);"
+    "font-size:var(--block-title-text-size);font-weight:500;margin-bottom:0}"
+)
 CREATOR_TAB_ID = "creator"  # so other tabs (community's Share-yours) can jump here
 WHO = "Who"  # the grid's display-only first column; cells are read by position, not header
 
@@ -321,7 +333,9 @@ def build_creator():
 
         start_grid = grid_value(blank.characters)
         with gr.Accordion(
-            "Dispositions — who starts feeling what about whom", open=False
+            "Dispositions — who starts feeling what about whom",
+            open=False,
+            elem_classes="rtr-fold",
         ):
             grid = gr.Dataframe(
                 value=start_grid,
@@ -331,11 +345,18 @@ def build_creator():
                 column_widths=grid_widths(len(start_grid.columns)),
             )
 
+        # a plain caption, not the component label: the theme's overlay label is the one
+        # pill left on the page and it sits straight on the drop zone's border
+        gr.Markdown(
+            "Scene picture — optional; the in-game backdrop, and your community card",
+            elem_classes="rtr-caption",
+        )
         picture = gr.Image(
-            label="Scene picture (optional — the in-game backdrop, and your community card)",
+            show_label=False,
             type="filepath",
             sources=["upload"],
             height=160,
+            elem_classes="rtr-drop",
         )
 
         cast = gr.State([c.name for c in blank.characters])
@@ -373,9 +394,12 @@ def build_creator():
         def locked(interactive):
             return lambda: [gr.update(interactive=interactive)] * len(lockable)
 
-        author_btn.click(locked(False), None, lockable).then(
-            author_handler, [idea, n], outputs
-        ).then(locked(True), None, lockable)
+        # gradio fires a multiline textbox's submit on Shift+Enter, so the idea box
+        # gets a keyboard path to the same locked authoring chain as the button
+        for trigger in (author_btn.click, idea.submit):
+            trigger(locked(False), None, lockable).then(
+                author_handler, [idea, n], outputs
+            ).then(locked(True), None, lockable)
         load_btn.upload(load_handler, [load_btn], outputs)
         # .input (not .change) so programmatic fills don't echo back through the handler
         for nm in names:
