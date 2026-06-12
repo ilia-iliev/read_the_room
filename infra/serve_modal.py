@@ -15,7 +15,7 @@ Deploy (env knobs: RTR_GPU, RTR_CTX — note the A10 OOMs on this config; 24 GB 
     uv run --group infra modal deploy infra/serve_modal.py
 
 Fallback to the Qwen GGUF the game was tuned on: set RTR_REPO/RTR_FILE/RTR_ALIAS at
-deploy time (drafter is skipped for non-Gemma models) and flip RTR_MODEL on the Space.
+deploy time (drafter is skipped for non-Gemma models).
 """
 
 import http.client
