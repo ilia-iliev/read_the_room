@@ -13,6 +13,7 @@ import creator
 from dispositions import party_keys
 
 MAX_CAST = 6  # the editor pre-builds this many character cards and shows the live ones
+CREATOR_TAB_ID = "creator"  # so other tabs (community's Share-yours) can jump here
 WHO = "Who"  # the grid's display-only first column; cells are read by position, not header
 
 
@@ -238,7 +239,7 @@ def build_creator():
     idea; pressing Play hands it to the dedicated Play tab. Returns the refs the top-level
     needs to wire that handoff: (play_btn, form_inputs)."""
     blank = creator.blank_spec(3)
-    with gr.Tab("✨ Create your own"):
+    with gr.Tab("✨ Create your own", id=CREATOR_TAB_ID):
         with gr.Row():
             idea = gr.Textbox(
                 label="Your idea",

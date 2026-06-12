@@ -1,7 +1,6 @@
 """The 'Community' view: a gallery of scenarios other players shared — pick a card, read
-the premise, play it — plus a share box that publishes a saved .txt (+ optional picture)
-for everyone. The creator tab shares the same way through its own button; both land in the
-dataset that `community` wraps.
+the premise, play it. Sharing happens in the creator tab (its 🌍 button publishes the
+form); this tab's Share-yours button just jumps there.
 """
 
 import gradio as gr
@@ -60,21 +59,10 @@ def play_or_raise(entries, picked):
         raise gr.Error(f"{creator.LOAD_ERROR}: {e}")
 
 
-def share_handler(path, image):
-    if not path:
-        raise gr.Error("Pick a scenario .txt to share")
-    try:
-        spec = creator.load_spec(path)
-        creator.spec_to_scenario(spec)  # publish only what actually plays
-        community.publish(spec, image)
-    except Exception as e:  # invalid spec / missing config / failed upload
-        raise gr.Error(f"Couldn't share: {e}")
-    gr.Info("Shared 🌍 — hit Refresh to see it in the gallery")
-
-
 def build_community():
-    """The Community tab. Returns (play_btn, inputs) for the top level to wire the
-    Play-tab handoff — the same handshake the creator hands back."""
+    """The Community tab. Returns (play_btn, inputs, share_btn) — the first two for the
+    top level to wire the Play-tab handoff (the same handshake the creator hands back),
+    the last to wire the jump to the creator tab."""
     with gr.Tab("🌍 Community") as tab:
         entries_state, picked = gr.State([]), gr.State()
         with gr.Row():
@@ -89,28 +77,13 @@ def build_community():
         )
         details = gr.Markdown()
         play_btn = gr.Button("Play it ▶", variant="primary")
-
-        with gr.Accordion("Share yours", open=False):
-            gr.Markdown(
-                "Anyone can add a scenario: upload a saved .txt (the creator's ⬇️ Save"
-                " format), add a picture if you like, and it appears here for everyone."
-            )
-            with gr.Row():
-                spec_file = gr.File(
-                    label="Scenario (.txt)", file_types=[".txt"], type="filepath"
-                )
-                picture = gr.Image(
-                    label="Picture (optional)",
-                    type="filepath",
-                    sources=["upload"],
-                    height=160,
-                )
-            share_btn = gr.Button("🌍 Share it", scale=0)
+        share_btn = gr.Button(
+            "🌍 Share yours — make it in ✨ Create your own", size="sm"
+        )
 
         refresh_outs = [entries_state, gallery, status, picked, details]
         refresh_btn.click(refresh, None, refresh_outs)
         tab.select(ensure_loaded, entries_state, refresh_outs)
         gallery.select(select_handler, entries_state, [picked, details])
-        share_btn.click(share_handler, [spec_file, picture], None)
 
-    return play_btn, [entries_state, picked]
+    return play_btn, [entries_state, picked], share_btn

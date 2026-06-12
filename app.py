@@ -110,7 +110,7 @@ with gr.Blocks(
     with gr.Tabs() as tabs:
         for scen in REGISTRY.values():
             gameview.build_game(scen)
-        comm_play, comm_inputs = communityview.build_community()
+        comm_play, comm_inputs, comm_share = communityview.build_community()
         play_btn, form = creatorview.build_creator()
         with gr.Tab("▶ Play your scenario", id=PLAY_TAB_ID):
             with gr.Row():
@@ -125,6 +125,7 @@ with gr.Blocks(
     comm_play.click(communityview.play_or_raise, comm_inputs, parse_state).success(
         do_load, parse_state, [tabs, *play_outs]
     )
+    comm_share.click(lambda: gr.update(selected=creatorview.CREATOR_TAB_ID), None, tabs)
     load_play.upload(load_scenario, load_play, play_outs)
     demo.load(warm_model)
 
