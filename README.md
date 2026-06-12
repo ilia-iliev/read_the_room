@@ -12,6 +12,8 @@ pinned: false
 
 # Track 2: Read the Room
 
+Play [here](https://huggingface.co/spaces/build-small-hackathon/read_the_room)
+
 You're a player in a situation where each character has an agenda and an opinion of everyone else, including you. You talk your way to a goal. The inspiration is text adventures RPGs like Zork crossed with social deduction games like Avalon and Werewolf. The social dynamic is the game - I've always wished videogame dialogues gave me more options to explore. Traditional games have always been constrained in this and current AI games dodge the social element: they usually focus on one character, or fixed characters on rails. So I built a game with multiple AIs reacting to each other and especially you (the player)
 
 Anyone can publish a scenario (optional but recommended scene picture) and play what others shared
