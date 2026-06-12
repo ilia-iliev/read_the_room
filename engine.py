@@ -30,7 +30,7 @@ from signatures import CharacterTurn, Finale, Referee, SituationDriver
 # the HF Space sets these as secrets pointing at the Modal deployment. All required;
 # locally they come from .env, on the Space from its secrets (no .env there).
 load_dotenv()
-MODEL = "openai/" + os.getenv("RTR_MODEL")
+MODEL = "openai/"
 API_BASE = os.getenv("RTR_API_BASE")
 API_KEY = os.getenv("RTR_API_KEY")
 # Qwen3.6 is a reasoning model; this toggle stops it burning the budget on hidden
